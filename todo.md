@@ -3,13 +3,13 @@
 ## Phase 1: Project Setup and Core Structures
 
 ### Project Initialization
-- [ ] Create standard Go project layout (cmd, pkg, internal directories)
-- [ ] Initialize go.mod with appropriate module name
-- [ ] Create basic main.go file in cmd/gochess with version info
-- [ ] Create Makefile with build, test, and clean targets
-- [ ] Create .gitignore file for Go projects
-- [ ] Create README.md with project description
-- [ ] Set up GitHub repository (optional)
+- [X] Create standard Go project layout (cmd, pkg, internal directories)
+- [X] Initialize go.mod with appropriate module name
+- [X] Create basic main.go file in cmd/gochess with version info
+- [X] Create Makefile with build, test, and clean targets
+- [X] Create .gitignore file for Go projects
+- [X] Create README.md with project description
+- [X] Set up GitHub repository (optional)
 
 ### Core Chess Data Structures
 - [ ] Create Position struct and methods
