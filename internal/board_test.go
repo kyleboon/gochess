@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -151,4 +152,160 @@ func TestBoardOpp(t *testing.T) {
 	assert.Equal(t, Piece(WK), b.opp(King))
 	assert.Equal(t, Piece(WN), b.opp(Knight))
 	assert.Equal(t, Piece(WB), b.opp(Bishop))
+}
+
+func TestSquareValue(t *testing.T) {
+	assert.Equal(t, 0, int(A1))
+	assert.Equal(t, 8, int(A2))
+	assert.Equal(t, 16, int(A3))
+	assert.Equal(t, 24, int(A4))
+	assert.Equal(t, 32, int(A5))
+	assert.Equal(t, 40, int(A6))
+	assert.Equal(t, 48, int(A7))
+	assert.Equal(t, 56, int(A8))
+	assert.Equal(t, 1, int(B1))
+	assert.Equal(t, 9, int(B2))
+	assert.Equal(t, 17, int(B3))
+	assert.Equal(t, 25, int(B4))
+	assert.Equal(t, 33, int(B5))
+	assert.Equal(t, 41, int(B6))
+	assert.Equal(t, 49, int(B7))
+	assert.Equal(t, 57, int(B8))
+}
+
+func TestSquareColor(t *testing.T) {
+	assert.Equal(t, Black, A1.Color())
+	assert.Equal(t, White, B1.Color())
+	assert.Equal(t, Black, C1.Color())
+	assert.Equal(t, White, D1.Color())
+	assert.Equal(t, Black, E1.Color())
+	assert.Equal(t, White, F1.Color())
+	assert.Equal(t, Black, G1.Color())
+	assert.Equal(t, White, H1.Color())
+	assert.Equal(t, White, A2.Color())
+	assert.Equal(t, Black, B2.Color())
+	assert.Equal(t, White, C2.Color())
+	assert.Equal(t, Black, D2.Color())
+	assert.Equal(t, White, E2.Color())
+	assert.Equal(t, Black, F2.Color())
+	assert.Equal(t, White, G2.Color())
+	assert.Equal(t, Black, H2.Color())
+}
+
+func TestGetPieceTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		fen      string
+		color    int
+		expected []GamePiece
+	}{
+		{
+			name:  "Starting position - White pieces",
+			fen:   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+			color: White,
+			expected: []GamePiece{{WR, A1}, {WN, B1}, {WB, C1}, {WQ, D1}, {WK, E1}, {WB, F1}, {WN, G1}, {WR, H1},
+				{WP, A2}, {WP, B2}, {WP, C2}, {WP, D2}, {WP, E2}, {WP, F2}, {WP, G2}, {WP, H2}},
+		},
+		{
+			name:  "Starting position - Black pieces",
+			fen:   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+			color: Black,
+			expected: []GamePiece{{BP, A7}, {BP, B7}, {BP, C7}, {BP, D7}, {BP, E7}, {BP, F7}, {BP, G7}, {BP, H7},
+				{BR, A8}, {BN, B8}, {BB, C8}, {BQ, D8}, {BK, E8}, {BB, F8}, {BN, G8}, {BR, H8},
+			},
+		},
+		{
+			name:     "Endgame with few pieces - White",
+			fen:      "8/5k2/8/8/8/8/4K3/4Q3 w - - 0 1",
+			color:    White,
+			expected: []GamePiece{{WQ, E1}, {WK, E2}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			board, err := ParseFen(tt.fen)
+			if err != nil {
+				t.Fatalf("Failed to parse FEN: %v", err)
+			}
+
+			got := board.GetPieceTypes(tt.color)
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("GetPieceTypes() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestHasInsufficientMaterial(t *testing.T) {
+	tests := []struct {
+		name     string
+		fen      string
+		expected bool
+	}{
+		{
+			name:     "Starting position",
+			fen:      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+			expected: false,
+		},
+		{
+			name:     "King vs King",
+			fen:      "4k3/8/8/8/8/8/8/4K3 w - - 0 1",
+			expected: true,
+		},
+		{
+			name:     "King vs King and Knight",
+			fen:      "4k3/8/8/8/8/8/5N2/4K3 w - - 0 1",
+			expected: true,
+		},
+		{
+			name:     "King vs King and Bishop",
+			fen:      "4k3/8/8/8/8/8/5B2/4K3 w - - 0 1",
+			expected: true,
+		},
+		{
+			name:     "King and Bishop vs King and Bishop (same color squares)",
+			fen:      "4k3/6b1/8/8/8/8/5B2/4K3 w - - 0 1",
+			expected: true,
+		},
+		{
+			name:     "King and Bishop vs King and Bishop (different color squares)",
+			fen:      "4k3/7b/8/8/8/8/5B2/4K3 w - - 0 1",
+			expected: true,
+		},
+		{
+			name:     "King and two Knights vs King",
+			fen:      "4k3/8/8/8/8/5N2/5N2/4K3 w - - 0 1",
+			expected: false, // Two knights can force mate
+		},
+		{
+			name:     "King and Pawn vs King",
+			fen:      "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1",
+			expected: false, // Pawn can promote
+		},
+		{
+			name:     "King and Rook vs King",
+			fen:      "4k3/8/8/8/8/8/8/4KR2 w - - 0 1",
+			expected: false, // Rook can deliver mate
+		},
+		{
+			name:     "King and Queen vs King",
+			fen:      "4k3/8/8/8/8/8/8/4KQ2 w - - 0 1",
+			expected: false, // Queen can deliver mate
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			board, err := ParseFen(tt.fen)
+			if err != nil {
+				t.Fatalf("Failed to parse FEN: %v", err)
+			}
+
+			got := board.HasInsufficientMaterial()
+			if got != tt.expected {
+				t.Errorf("HasInsufficientMaterial() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
 }

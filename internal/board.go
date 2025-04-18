@@ -171,5 +171,191 @@ type Board struct {
 	checkTo    Sq        //      [A1,A1] if opp did not castle last turn.
 }
 
+type GamePiece struct {
+	piece Piece
+	sq    Sq
+}
+
+func (sq Sq) Color() int { return (sq.File() + sq.Rank() + 1) % 2 }
+
 func (b *Board) my(piece int) Piece  { return Piece(b.SideToMove | piece) }
 func (b *Board) opp(piece int) Piece { return Piece(b.SideToMove ^ 1 | piece) }
+
+// MakeMove returns a copy of the Board with move m applied.
+func (b Board) MakeMove(m Move) *Board {
+	epSquare := b.EpSquare // remember en passant square
+
+	// these are reset by making a move
+	b.EpSquare = NoSquare
+	b.checkFrom, b.checkTo = A1, A1
+
+	switch {
+	case m == NullMove:
+		// do nothing
+	case b.Piece[m.From] == b.my(King) && b.Piece[m.To] == b.my(Rook): // castling
+		wing := kingSide
+		if m.To < m.From {
+			wing = queenSide
+		}
+		rf, kf, rt, kt, _, _ := b.castleSquares(wing)
+		b.Piece[rf] = NoPiece
+		b.Piece[kf] = NoPiece
+		b.Piece[rt] = b.my(Rook)
+		b.Piece[kt] = b.my(King)
+		if kf < kt {
+			b.checkFrom, b.checkTo = kf, kt
+		} else {
+			b.checkFrom, b.checkTo = kt, kf
+		}
+		b.CastleSq[b.SideToMove|kingSide] = NoSquare
+		b.CastleSq[b.SideToMove|queenSide] = NoSquare
+		b.Rule50++
+	default:
+		piece := b.Piece[m.From]
+		if piece.Type() == Pawn {
+			switch dy := m.To.Rank() - m.From.Rank(); {
+			case dy == 2 || dy == -2:
+				b.EpSquare = Square(m.From.File(), m.From.Rank()+dy/2)
+			case m.To == epSquare:
+				// move the captured pawn to the ep-square, so
+				// that Rule50 is updated correctly below
+				b.Piece[Square(m.To.File(), m.From.Rank())] = NoPiece
+				b.Piece[epSquare] = b.opp(Pawn)
+			case m.To.RelativeRank(b.SideToMove) == Rank8:
+				b.Piece[m.From] = m.Promotion
+			}
+		}
+		// update castling rights
+		for i, sq := range b.CastleSq {
+			if sq == m.From || sq == m.To {
+				b.CastleSq[i] = NoSquare
+			}
+		}
+		if piece.Type() == King {
+			b.CastleSq[b.SideToMove|kingSide] = NoSquare
+			b.CastleSq[b.SideToMove|queenSide] = NoSquare
+		}
+		// update the 50-move rule counter
+		if piece.Type() == Pawn || b.Piece[m.To] != NoPiece {
+			b.Rule50 = 0
+		} else {
+			b.Rule50++
+		}
+		// move the piece
+		b.Piece[m.To] = b.Piece[m.From]
+		b.Piece[m.From] = NoPiece
+	}
+	// switch side to move
+	if b.SideToMove ^= 1; b.SideToMove == White {
+		b.MoveNr++
+	}
+	return &b
+}
+
+// find locates a piece in the given range of squares.
+func (b *Board) find(piece Piece, sq0, sq1 Sq) Sq {
+	dir := Sq(1)
+	if sq0 > sq1 {
+		dir = -1
+	}
+	for sq := sq0; sq != sq1+dir; sq += dir {
+		if b.Piece[sq] == piece {
+			return sq
+		}
+	}
+	return NoSquare
+}
+
+// GetPieceTypes returns a map of piece types to their counts for the given color.
+// For example, if White has 2 bishops and 1 queen, the result would be:
+// map[Bishop:2 Queen:1]
+// Kings are excluded from the results as they are always present.
+func (b *Board) GetPieceTypes(color int) []GamePiece {
+	pieces := []GamePiece{}
+
+	for sq := A1; sq <= H8; sq++ {
+		piece := b.Piece[sq]
+		if piece == NoPiece || piece.Color() != color {
+			continue
+		}
+
+		pieces = append(pieces, GamePiece{piece, sq})
+	}
+
+	return pieces
+}
+
+func (b *Board) HasInsufficientMaterial() bool {
+	whitePieces := b.GetPieceTypes(White)
+	blackPieces := b.GetPieceTypes(Black)
+
+	if len(whitePieces) > 3 || len(blackPieces) > 3 {
+		return false
+	}
+
+	// if white has a rook, a pawn or a queen
+	whiteHasLightColoredBishop := false
+	whiteHasDarkColoredBishop := false
+	whiteKnightCount := 0
+	for _, piece := range whitePieces {
+		if piece.piece == WR || piece.piece == WP || piece.piece == WQ {
+			return false
+		}
+		if piece.piece == WB {
+			if piece.sq.Color() == 0 {
+				whiteHasLightColoredBishop = true
+			} else {
+				whiteHasDarkColoredBishop = true
+			}
+		}
+		if piece.piece == WN {
+			whiteKnightCount++
+		}
+	}
+
+	if whiteHasLightColoredBishop && whiteHasDarkColoredBishop {
+		return false
+	}
+
+	if whiteKnightCount > 1 {
+		return false
+	}
+
+	if (whiteHasLightColoredBishop || whiteHasDarkColoredBishop) && whiteKnightCount >= 1 {
+		return false
+	}
+
+	// if black has a rook, a pawn or a queen
+	blackHasLightColoredBishop := false
+	blackHasDarkColoredBishop := false
+	blackKnightCount := 0
+	for _, piece := range blackPieces {
+		if piece.piece == BR || piece.piece == BP || piece.piece == BQ {
+			return false
+		}
+		if piece.piece == WB {
+			if piece.sq.Color() == 0 {
+				blackHasLightColoredBishop = true
+			} else {
+				blackHasDarkColoredBishop = true
+			}
+		}
+		if piece.piece == WN {
+			blackKnightCount++
+		}
+	}
+
+	if blackHasLightColoredBishop && blackHasDarkColoredBishop {
+		return false
+	}
+
+	if blackKnightCount > 1 {
+		return false
+	}
+
+	if (blackHasLightColoredBishop || blackHasDarkColoredBishop) && blackKnightCount >= 1 {
+		return false
+	}
+
+	return true
+}
