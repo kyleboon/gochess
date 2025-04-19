@@ -170,22 +170,51 @@ func (m Move) algebraicNotation(b *Board, pieceLetters []rune) string {
 			buf.WriteString("O-O-O")
 		}
 	default:
-		var disambiguateByFile, disambiguateByRank bool
+		var needFileDisambiguation, needRankDisambiguation bool
 		isCapture := b.Piece[m.To] != NoPiece
 		switch piece {
 		case Pawn:
 			isCapture = m.From.File() != m.To.File()
-			disambiguateByFile = isCapture
+			needFileDisambiguation = isCapture
 		case Knight, Bishop, Rook, Queen:
 			moves, _ := b.pseudoLegalMoves()
+			// Find all pieces of the same type that can move to the same destination
+			sameTypeToSameSquare := []Move{}
 			for _, n := range moves {
 				if n.To == m.To && n.From != m.From &&
 					b.Piece[n.From] == b.Piece[m.From] &&
 					n.isLegal(b) {
-					if n.From.File() != m.From.File() {
-						disambiguateByFile = true
+					sameTypeToSameSquare = append(sameTypeToSameSquare, n)
+				}
+			}
+			if len(sameTypeToSameSquare) > 0 {
+				// Try to disambiguate by file first
+				fileAmbiguous := false
+				for _, n := range sameTypeToSameSquare {
+					if n.From.File() == m.From.File() {
+						fileAmbiguous = true
+						break
+					}
+				}
+				if !fileAmbiguous {
+					// Can disambiguate by file
+					needFileDisambiguation = true
+				} else {
+					// File is ambiguous, try rank
+					rankAmbiguous := false
+					for _, n := range sameTypeToSameSquare {
+						if n.From.Rank() == m.From.Rank() {
+							rankAmbiguous = true
+							break
+						}
+					}
+					if !rankAmbiguous {
+						// Can disambiguate by rank
+						needRankDisambiguation = true
 					} else {
-						disambiguateByRank = true
+						// Need both file and rank
+						needFileDisambiguation = true
+						needRankDisambiguation = true
 					}
 				}
 			}
@@ -193,10 +222,10 @@ func (m Move) algebraicNotation(b *Board, pieceLetters []rune) string {
 		if piece != Pawn {
 			buf.WriteRune(pieceLetters[piece])
 		}
-		if disambiguateByFile {
+		if needFileDisambiguation {
 			buf.WriteRune(rune('a' + m.From.File()))
 		}
-		if disambiguateByRank {
+		if needRankDisambiguation {
 			buf.WriteRune(rune('1' + m.From.Rank()))
 		}
 		if isCapture {

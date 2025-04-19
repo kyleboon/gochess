@@ -50,7 +50,7 @@ func TestAlgebraicNotation(t *testing.T) {
 	}
 
 	// Verify that the algebraic notation of the move is correct
-	san := move.San(newBoard)
+	san := move.San(board)
 	if san != "e4" {
 		t.Errorf("Expected SAN notation to be 'e4', got '%s'", san)
 	}
