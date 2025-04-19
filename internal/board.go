@@ -266,6 +266,26 @@ func (b *Board) find(piece Piece, sq0, sq1 Sq) Sq {
 	return NoSquare
 }
 
+// Copy creates and returns a deep copy of the board
+func (b *Board) Copy() *Board {
+	newBoard := &Board{
+		SideToMove: b.SideToMove,
+		MoveNr:     b.MoveNr,
+		Rule50:     b.Rule50,
+		EpSquare:   b.EpSquare,
+		checkFrom:  b.checkFrom,
+		checkTo:    b.checkTo,
+	}
+	
+	// Copy piece array
+	copy(newBoard.Piece[:], b.Piece[:])
+	
+	// Copy castling rights
+	copy(newBoard.CastleSq[:], b.CastleSq[:])
+	
+	return newBoard
+}
+
 // GetPieceTypes returns a map of piece types to their counts for the given color.
 // For example, if White has 2 bishops and 1 queen, the result would be:
 // map[Bishop:2 Queen:1]
