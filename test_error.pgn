@@ -1,0 +1,9 @@
+[Event "Test Game with Error"]
+[Site "Local"]
+[Date "2023.10.27"]
+[Round "-"]
+[White "Test A"]
+[Black "Test B"]
+[Result "*"]
+
+1. e5 { This is an illegal move } *

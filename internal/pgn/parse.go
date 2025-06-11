@@ -127,7 +127,11 @@ func (p *parser) readGame() (game *Game, err error) {
 	for p.accept(itemLBracket) {
 		tag := p.expect(itemSymbol).val
 		val := p.expect(itemString).val
-		tags[tag] = unescape(val)
+		// Ignore FEN and CurrentPosition tags, which are used by chess.com
+		// for the end position, which is not what we want for import.
+		if tag != "FEN" && tag != "CurrentPosition" {
+			tags[tag] = unescape(val)
+		}
 		p.expect(itemRBracket)
 		// Remember where the movetext starts. Maintaining this inside
 		// the loop ensures that initial comments, which will be

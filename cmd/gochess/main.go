@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kyleboon/gochess/internal/chesscom"
+	"github.com/kyleboon/gochess/internal/db"
 	"github.com/urfave/cli/v2"
 )
 
@@ -75,6 +76,26 @@ func main() {
 								Aliases: []string{"o"},
 								Usage:   "Output file path (default: stdout)",
 							},
+							&cli.BoolFlag{
+								Name:  "import-db",
+								Usage: "Import games directly into the database",
+							},
+							&cli.StringFlag{
+								Name:    "database",
+								Aliases: []string{"db"},
+								Usage:   "Path to database file (for import-db option)",
+								Value:   "~/.gochess/games.db",
+							},
+							&cli.BoolFlag{
+								Name:    "verbose",
+								Aliases: []string{"v"},
+								Usage:   "Show detailed error messages",
+							},
+							&cli.BoolFlag{
+								Name:    "all-history",
+								Aliases: []string{"a"},
+								Usage:   "Download all available game history (ignores year/month options)",
+							},
 						},
 						Action: chesscom.DownloadGames,
 					},
@@ -135,6 +156,169 @@ func main() {
 					},
 				},
 				Action: analyzeAction,
+			},
+			{
+				Name:  "db",
+				Usage: "Manage PGN database",
+				Subcommands: []*cli.Command{
+					{
+						Name:  "import",
+						Usage: "Import PGN files into the database",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:     "pgn",
+								Aliases:  []string{"p"},
+								Usage:    "Path to PGN file or directory of PGN files",
+								Required: true,
+							},
+							&cli.StringFlag{
+								Name:    "database",
+								Aliases: []string{"db"},
+								Usage:   "Path to database file",
+								Value:   "~/.gochess/games.db",
+							},
+							&cli.BoolFlag{
+								Name:    "verbose",
+								Aliases: []string{"v"},
+								Usage:   "Show detailed error messages",
+							},
+						},
+						Action: db.ImportCommand,
+					},
+					{
+						Name:  "list",
+						Usage: "List games in the database",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:    "database",
+								Aliases: []string{"db"},
+								Usage:   "Path to database file",
+								Value:   "~/.gochess/games.db",
+							},
+							&cli.StringFlag{
+								Name:    "white",
+								Aliases: []string{"w"},
+								Usage:   "Filter by white player",
+							},
+							&cli.StringFlag{
+								Name:    "black",
+								Aliases: []string{"b"},
+								Usage:   "Filter by black player",
+							},
+							&cli.StringFlag{
+								Name:    "event",
+								Aliases: []string{"e"},
+								Usage:   "Filter by event",
+							},
+							&cli.StringFlag{
+								Name:    "date",
+								Aliases: []string{"d"},
+								Usage:   "Filter by date",
+							},
+							&cli.IntFlag{
+								Name:    "limit",
+								Aliases: []string{"n"},
+								Usage:   "Maximum number of results",
+								Value:   20,
+							},
+							&cli.IntFlag{
+								Name:  "offset",
+								Usage: "Result offset (for pagination)",
+								Value: 0,
+							},
+						},
+						Action: db.ListCommand,
+					},
+					{
+						Name:  "show",
+						Usage: "Show details of a specific game",
+						Flags: []cli.Flag{
+							&cli.IntFlag{
+								Name:     "id",
+								Usage:    "Game ID",
+								Required: true,
+							},
+							&cli.StringFlag{
+								Name:    "database",
+								Aliases: []string{"db"},
+								Usage:   "Path to database file",
+								Value:   "~/.gochess/games.db",
+							},
+							&cli.BoolFlag{
+								Name:    "pgn",
+								Usage:   "Show PGN text",
+								Value:   true,
+							},
+						},
+						Action: db.ShowCommand,
+					},
+					{
+						Name:  "export",
+						Usage: "Export games to PGN format",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:    "database",
+								Aliases: []string{"db"},
+								Usage:   "Path to database file",
+								Value:   "~/.gochess/games.db",
+							},
+							&cli.IntFlag{
+								Name:  "id",
+								Usage: "Export specific game by ID (if not specified, export all games)",
+							},
+							&cli.StringFlag{
+								Name:    "output",
+								Aliases: []string{"o"},
+								Usage:   "Output file path (default: stdout)",
+							},
+						},
+						Action: db.ExportCommand,
+					},
+					{
+						Name:    "clear",
+						Aliases: []string{"c"},
+						Usage:   "Clear all games from the database",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:    "database",
+								Aliases: []string{"db"},
+								Usage:   "Path to database file",
+								Value:   "~/.gochess/games.db",
+							},
+							&cli.BoolFlag{
+								Name:    "force",
+								Aliases: []string{"f"},
+								Usage:   "Clear without confirmation prompt",
+							},
+						},
+						Action: db.ClearCommand,
+					},
+					{
+						Name:    "stats",
+						Aliases: []string{"st"},
+						Usage:   "Show win rate statistics for players in the database",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:    "database",
+								Aliases: []string{"db"},
+								Usage:   "Path to database file",
+								Value:   "~/.gochess/games.db",
+							},
+							&cli.StringFlag{
+								Name:    "player",
+								Aliases: []string{"p"},
+								Usage:   "Filter statistics for a specific player",
+							},
+							&cli.StringFlag{
+								Name:    "format",
+								Aliases: []string{"f"},
+								Usage:   "Output format (table or csv)",
+								Value:   "table",
+							},
+						},
+						Action: db.StatsCommand,
+					},
+				},
 			},
 		},
 	}
