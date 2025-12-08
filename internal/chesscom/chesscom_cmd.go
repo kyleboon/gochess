@@ -1,6 +1,7 @@
 package chesscom
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,7 +34,7 @@ func ListArchives(c *cli.Context) error {
 
 	fmt.Printf("Fetching available archives for %s...\n", username)
 
-	archives, err := client.GetArchivedMonths(username)
+	archives, err := client.GetArchivedMonths(c.Context, username)
 	if err != nil {
 		return fmt.Errorf("failed to fetch archives: %w", err)
 	}
@@ -48,12 +49,12 @@ func ListArchives(c *cli.Context) error {
 
 // downloadAndImportMonthlyGames downloads and optionally imports games for a specific month
 // If externalDB is provided, it will be used instead of opening a new connection
-func downloadAndImportMonthlyGames(username string, year, month int, format, output, dbPath string, importDB, verbose bool, externalDB *db.DB) (int, error) {
+func downloadAndImportMonthlyGames(ctx context.Context, username string, year, month int, format, output, dbPath string, importDB, verbose bool, externalDB *db.DB) (int, error) {
 	client := NewClient()
 	fmt.Printf("Fetching games for %s (%d/%02d)...\n", username, year, month)
-	
+
 	// Get the PGN data
-	pgn, err := client.GetPlayerGamesPGN(username, year, month)
+	pgn, err := client.GetPlayerGamesPGN(ctx, username, year, month)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch PGN for %d/%02d: %w", year, month, err)
 	}
@@ -166,7 +167,7 @@ func DownloadGames(c *cli.Context) error {
 	if allHistory {
 		// Fetch all available archives
 		fmt.Printf("Fetching available archives for %s...\n", username)
-		archives, err := client.GetArchivedMonths(username)
+		archives, err := client.GetArchivedMonths(c.Context, username)
 		if err != nil {
 			return fmt.Errorf("failed to fetch archives: %w", err)
 		}
@@ -214,13 +215,14 @@ func DownloadGames(c *cli.Context) error {
 			
 			// Download and process games for this month
 			monthlyGames, err := downloadAndImportMonthlyGames(
-				username, 
-				archiveYear, 
-				archiveMonth, 
-				format, 
-				output, 
+				c.Context,
+				username,
+				archiveYear,
+				archiveMonth,
+				format,
+				output,
 				"", // Empty dbPath because we already opened the database
-				importDB, 
+				importDB,
 				verbose,
 				database, // Pass the database connection
 			)
@@ -258,6 +260,7 @@ func DownloadGames(c *cli.Context) error {
 	if importDB {
 		// Use our reusable function to handle the download and import
 		count, err := downloadAndImportMonthlyGames(
+			c.Context,
 			username,
 			year,
 			month,
@@ -301,7 +304,7 @@ func DownloadGames(c *cli.Context) error {
 
 	switch format {
 	case "pgn":
-		pgn, err := client.GetPlayerGamesPGN(username, year, month)
+		pgn, err := client.GetPlayerGamesPGN(c.Context, username, year, month)
 		if err != nil {
 			return fmt.Errorf("failed to fetch PGN: %w", err)
 		}
@@ -314,7 +317,7 @@ func DownloadGames(c *cli.Context) error {
 		}
 
 	case "json":
-		games, err := client.GetPlayerGames(username, year, month)
+		games, err := client.GetPlayerGames(c.Context, username, year, month)
 		if err != nil {
 			return fmt.Errorf("failed to fetch games: %w", err)
 		}
@@ -338,7 +341,7 @@ func DownloadGames(c *cli.Context) error {
 		}
 
 	case "summary":
-		games, err := client.GetPlayerGames(username, year, month)
+		games, err := client.GetPlayerGames(c.Context, username, year, month)
 		if err != nil {
 			return fmt.Errorf("failed to fetch games: %w", err)
 		}
@@ -383,7 +386,7 @@ func parseArchiveMonth(monthStr string) (int, error) {
 }
 
 // ConvertToDatabase fetches and converts games to a PGN database
-func ConvertToDatabase(username string, year, month int) (*GamesResponse, error) {
+func ConvertToDatabase(ctx context.Context, username string, year, month int) (*GamesResponse, error) {
 	client := NewClient()
-	return client.GetPlayerGames(username, year, month)
+	return client.GetPlayerGames(ctx, username, year, month)
 }

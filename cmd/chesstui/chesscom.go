@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -150,7 +151,7 @@ func (m chesscomModel) Init() tea.Cmd {
 func fetchArchives(username string) tea.Cmd {
 	return func() tea.Msg {
 		client := chesscom.NewClient()
-		archives, err := client.GetArchivedMonths(username)
+		archives, err := client.GetArchivedMonths(context.Background(), username)
 		if err != nil {
 			return fetchArchivesErrMsg{err: err}
 		}
@@ -172,7 +173,7 @@ func fetchGames(archiveURL string) tea.Cmd {
 		username := parts[len(parts)-4]
 
 		client := chesscom.NewClient()
-		games, err := client.GetPlayerGames(username, year, month)
+		games, err := client.GetPlayerGames(context.Background(), username, year, month)
 		if err != nil {
 			return fetchGamesErrMsg{err: err}
 		}
@@ -193,7 +194,7 @@ func fetchPGN(archiveURL string) tea.Cmd {
 		username := parts[len(parts)-4]
 
 		client := chesscom.NewClient()
-		pgnData, err := client.GetPlayerGamesPGN(username, year, month)
+		pgnData, err := client.GetPlayerGamesPGN(context.Background(), username, year, month)
 		if err != nil {
 			return fetchPGNErrMsg{err: err}
 		}

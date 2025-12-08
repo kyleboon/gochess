@@ -2,6 +2,7 @@
 package chesscom
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,10 +29,15 @@ func NewClient() *Client {
 }
 
 // GetPlayerGames fetches a list of games for a specific user in a given month and year.
-func (c *Client) GetPlayerGames(username string, year, month int) (*GamesResponse, error) {
+func (c *Client) GetPlayerGames(ctx context.Context, username string, year, month int) (*GamesResponse, error) {
 	url := fmt.Sprintf("%s/player/%s/games/%d/%02d", baseURL, username, year, month)
 
-	resp, err := c.httpClient.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch games: %w", err)
 	}
@@ -55,12 +61,17 @@ func (c *Client) GetPlayerGames(username string, year, month int) (*GamesRespons
 }
 
 // GetPlayerGamesPGN downloads the PGN file containing all games for a specific user in a given month and year.
-func (c *Client) GetPlayerGamesPGN(username string, year, month int) (string, error) {
+func (c *Client) GetPlayerGamesPGN(ctx context.Context, username string, year, month int) (string, error) {
 	url := fmt.Sprintf("%s/player/%s/games/%d/%02d/pgn", baseURL, username, year, month)
 
 	fmt.Printf("Fetching PGN for %s (%d/%02d)\n", username, year, month)
 
-	resp, err := c.httpClient.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch PGN: %w", err)
 	}
@@ -79,10 +90,15 @@ func (c *Client) GetPlayerGamesPGN(username string, year, month int) (string, er
 }
 
 // GetArchivedMonths returns a list of monthly archives available for a player.
-func (c *Client) GetArchivedMonths(username string) (*ArchivesResponse, error) {
+func (c *Client) GetArchivedMonths(ctx context.Context, username string) (*ArchivesResponse, error) {
 	url := fmt.Sprintf("%s/player/%s/games/archives", baseURL, username)
 
-	resp, err := c.httpClient.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch archives: %w", err)
 	}
