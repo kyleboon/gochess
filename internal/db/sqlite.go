@@ -140,6 +140,109 @@ func (db *DB) addColumnIfNotExists(table, columnDef string) error {
 	return nil
 }
 
+// processParseErrors converts parsing errors into PGNImportErrors with associated game text
+func processParseErrors(parseErrors []error, pgnData *PGNData) []error {
+	allErrors := make([]error, 0, len(parseErrors))
+
+	for _, errInstance := range parseErrors {
+		var originalPgnError error
+		var errorLine int
+		isPgnParseError := false
+
+		// Type assertion to get *pgn.ParseError
+		if pe, ok := errInstance.(*pgn.ParseError); ok {
+			originalPgnError = pe
+			errorLine = pe.Line
+			isPgnParseError = true
+		} else {
+			originalPgnError = errInstance
+		}
+
+		foundGameText := ""
+		if isPgnParseError && pgnData != nil && pgnData.GameTexts != nil {
+			// Find which game text contains the error line
+			currentLine := 1
+			for _, gameText := range pgnData.GameTexts {
+				lineCount := strings.Count(gameText, "\n")
+				separatorLines := 2
+				if errorLine >= currentLine && errorLine < currentLine+lineCount+separatorLines {
+					foundGameText = gameText
+					break
+				}
+				currentLine += lineCount + separatorLines
+			}
+		}
+		allErrors = append(allErrors, &PGNImportError{OriginalError: originalPgnError, PGNText: foundGameText})
+	}
+
+	return allErrors
+}
+
+// validateGameTags checks if all required tags are present in a game
+func validateGameTags(game *pgn.Game) error {
+	requiredTags := []string{"Event", "Site", "Date", "White", "Black", "Result"}
+	missingTags := []string{}
+
+	for _, tag := range requiredTags {
+		if _, ok := game.Tags[tag]; !ok || game.Tags[tag] == "" {
+			missingTags = append(missingTags, tag)
+		}
+	}
+
+	if len(missingTags) > 0 {
+		return fmt.Errorf("missing required tags: %s", strings.Join(missingTags, ", "))
+	}
+
+	return nil
+}
+
+// checkDuplicateGame checks if a game with the given hash already exists in the database
+func checkDuplicateGame(tx *sql.Tx, gameHash string) (bool, error) {
+	var existingID int
+	err := tx.QueryRow("SELECT id FROM games WHERE game_hash = ?", gameHash).Scan(&existingID)
+	if err == nil {
+		// Game exists
+		return true, nil
+	} else if err == sql.ErrNoRows {
+		// Game doesn't exist
+		return false, nil
+	}
+	// Unexpected error
+	return false, err
+}
+
+// insertGameRecord inserts a game and its tags into the database
+func insertGameRecord(ctx context.Context, tx *sql.Tx, stmtGame, stmtTag *sql.Stmt, game *pgn.Game, gameText, gameHash string) error {
+	// Parse ELO ratings
+	whiteElo, _ := strconv.Atoi(game.Tags["WhiteElo"])
+	blackElo, _ := strconv.Atoi(game.Tags["BlackElo"])
+
+	// Insert game
+	res, err := stmtGame.Exec(
+		game.Tags["Event"], game.Tags["Site"], game.Tags["Date"], game.Tags["Round"],
+		game.Tags["White"], game.Tags["Black"], game.Tags["Result"],
+		whiteElo, blackElo, game.Tags["TimeControl"],
+		gameText, gameHash,
+	)
+	if err != nil {
+		return fmt.Errorf("error inserting game: %w", err)
+	}
+
+	gameID, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("error getting last insert ID: %w", err)
+	}
+
+	// Insert tags
+	for name, value := range game.Tags {
+		if _, err := stmtTag.Exec(gameID, name, value); err != nil {
+			return fmt.Errorf("error inserting tag %s: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
 // ImportPGN imports games from a PGN file into the database
 func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 	allErrors := make([]error, 0)
@@ -149,39 +252,7 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 
 	// Process PGN parsing errors
 	if len(parseErrors) > 0 {
-		for _, errInstance := range parseErrors {
-			var originalPgnError error
-			var errorLine int
-			isPgnParseError := false
-
-			// Type assertion to get *pgn.ParseError, which implements the error interface
-			if pe, ok := errInstance.(*pgn.ParseError); ok {
-				originalPgnError = pe
-				errorLine = pe.Line
-				isPgnParseError = true
-			} else {
-				originalPgnError = errInstance // Not a pgn.ParseError we can get line from
-			}
-
-			foundGameText := ""
-			if isPgnParseError && pgnData != nil && pgnData.GameTexts != nil {
-				// The parser gives a line number relative to the entire file content it parsed.
-				// We need to find which of our split game texts contains that line.
-				// We do this by tracking the cumulative line count.
-				currentLine := 1
-				for _, gameText := range pgnData.GameTexts {
-					lineCount := strings.Count(gameText, "\n")
-					// The preprocessor joins games with "\n\n"
-					separatorLines := 2
-					if errorLine >= currentLine && errorLine < currentLine+lineCount+separatorLines {
-						foundGameText = gameText
-						break
-					}
-					currentLine += lineCount + separatorLines
-				}
-			}
-			allErrors = append(allErrors, &PGNImportError{OriginalError: originalPgnError, PGNText: foundGameText})
-		}
+		allErrors = append(allErrors, processParseErrors(parseErrors, pgnData)...)
 	}
 
 	// Check if we parsed any games
@@ -245,23 +316,14 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 		if i < len(gameTexts) {
 			currentGameText = gameTexts[i]
 		} else {
-			// This case should ideally not happen if parsing was successful
-			// and gameTexts corresponds to pgnDB.Games
 			err := fmt.Errorf("could not find PGN text for game index %d", i)
 			allErrors = append(allErrors, &PGNImportError{OriginalError: err, PGNText: ""})
 			continue
 		}
 
 		// Validate required tags
-		missingTags := []string{}
-		for _, requiredTag := range []string{"Event", "Site", "Date", "White", "Black", "Result"} {
-			if _, ok := game.Tags[requiredTag]; !ok || game.Tags[requiredTag] == "" {
-				missingTags = append(missingTags, requiredTag)
-			}
-		}
-		if len(missingTags) > 0 {
-			err := fmt.Errorf("game %d is missing required tags: %s", i+1, strings.Join(missingTags, ", "))
-			allErrors = append(allErrors, &PGNImportError{OriginalError: err, PGNText: currentGameText})
+		if err := validateGameTags(game); err != nil {
+			allErrors = append(allErrors, &PGNImportError{OriginalError: fmt.Errorf("game %d: %w", i+1, err), PGNText: currentGameText})
 			continue
 		}
 
@@ -274,52 +336,25 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 		moveText := ExtractMoveText(currentGameText)
 		gameHash := CalculateGameHash(game, moveText)
 
-		// Check if game_hash already exists
-		var existingID int
-		err := tx.QueryRow("SELECT id FROM games WHERE game_hash = ?", gameHash).Scan(&existingID)
-		if err == nil {
-			// Game with this hash already exists, skip.
-			continue
-		} else if err != sql.ErrNoRows {
-			// Unexpected error during hash check.
-			dbErr := fmt.Errorf("error checking game_hash for game %d (event: %s, hash: %s): %w", i+1, game.Tags["Event"], gameHash, err)
-			allErrors = append(allErrors, &PGNImportError{OriginalError: dbErr, PGNText: currentGameText})
-			continue
-		}
-
-		// Game hash does not exist (sql.ErrNoRows), proceed with insert.
-		// Parse ELO ratings
-		whiteElo, _ := strconv.Atoi(game.Tags["WhiteElo"])
-		blackElo, _ := strconv.Atoi(game.Tags["BlackElo"])
-
-		// Insert game
-		res, err := stmtGame.Exec(
-			game.Tags["Event"], game.Tags["Site"], game.Tags["Date"], game.Tags["Round"],
-			game.Tags["White"], game.Tags["Black"], game.Tags["Result"],
-			whiteElo, blackElo, game.Tags["TimeControl"],
-			currentGameText, gameHash,
-		)
+		// Check if game already exists
+		isDuplicate, err := checkDuplicateGame(tx, gameHash)
 		if err != nil {
-			dbErr := fmt.Errorf("error inserting game %d (event: %s): %w", i+1, game.Tags["Event"], err)
+			dbErr := fmt.Errorf("error checking duplicate for game %d (event: %s): %w", i+1, game.Tags["Event"], err)
+			allErrors = append(allErrors, &PGNImportError{OriginalError: dbErr, PGNText: currentGameText})
+			continue
+		}
+		if isDuplicate {
+			// Game already exists, skip
+			continue
+		}
+
+		// Insert game and tags
+		if err := insertGameRecord(ctx, tx, stmtGame, stmtTag, game, currentGameText, gameHash); err != nil {
+			dbErr := fmt.Errorf("game %d (event: %s): %w", i+1, game.Tags["Event"], err)
 			allErrors = append(allErrors, &PGNImportError{OriginalError: dbErr, PGNText: currentGameText})
 			continue
 		}
 
-		gameID, err := res.LastInsertId()
-		if err != nil {
-			dbErr := fmt.Errorf("error getting last insert ID for game %d: %w", i+1, err)
-			allErrors = append(allErrors, &PGNImportError{OriginalError: dbErr, PGNText: currentGameText})
-			continue
-		}
-
-		// Insert tags
-		for name, value := range game.Tags {
-			if _, err := stmtTag.Exec(gameID, name, value); err != nil {
-				dbErr := fmt.Errorf("error inserting tag for game ID %d (tag: %s): %w", gameID, name, err)
-				allErrors = append(allErrors, &PGNImportError{OriginalError: dbErr, PGNText: currentGameText})
-				// Continue to insert other tags
-			}
-		}
 		importedCount++
 	}
 
