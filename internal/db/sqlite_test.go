@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"os"
 	"testing"
 )
@@ -20,7 +21,7 @@ func TestImportPGN_WithFEN(t *testing.T) {
 
 	// Test with a PGN file that has a FEN, which should be ignored
 	pgnPath := "../../testdata/invalid_fen.pgn"
-	count, errors := db.ImportPGN(pgnPath)
+	count, errors := db.ImportPGN(context.Background(), pgnPath)
 
 	if len(errors) != 0 {
 		t.Fatalf("expected 0 errors, but got %d: %v", len(errors), errors)

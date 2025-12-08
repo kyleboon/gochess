@@ -100,7 +100,7 @@ func downloadAndImportMonthlyGames(ctx context.Context, username string, year, m
 		}
 
 		// Import the PGN file
-		count, errors := database.ImportPGN(tmpPath)
+		count, errors := database.ImportPGN(ctx, tmpPath)
 
 		// Print import results
 		if len(errors) > 0 && verbose {
@@ -247,7 +247,7 @@ func DownloadGames(c *cli.Context) error {
 			fmt.Printf("Total games imported: %d\n", totalGames)
 			
 			// Get current game count in database
-			currentCount, err := database.GetGameCount()
+			currentCount, err := database.GetGameCount(c.Context)
 			if err == nil {
 				fmt.Printf("Total games in database: %d\n", currentCount)
 			}

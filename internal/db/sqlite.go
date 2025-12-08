@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -140,7 +141,7 @@ func (db *DB) addColumnIfNotExists(table, columnDef string) error {
 }
 
 // ImportPGN imports games from a PGN file into the database
-func (db *DB) ImportPGN(filePath string) (int, []error) {
+func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 	allErrors := make([]error, 0)
 
 	// Parse PGN file using our adapter that handles different PGN formats and preserves the move text
@@ -198,7 +199,7 @@ func (db *DB) ImportPGN(filePath string) (int, []error) {
 	gameTexts := pgnData.GameTexts
 
 	// Begin transaction
-	tx, err := db.conn.Begin()
+	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		allErrors = append(allErrors, &PGNImportError{OriginalError: fmt.Errorf("failed to begin transaction: %w", err), PGNText: ""})
 		return 0, allErrors
@@ -211,9 +212,9 @@ func (db *DB) ImportPGN(filePath string) (int, []error) {
 	}()
 
 	// Prepare statements
-	stmtGame, err := tx.Prepare(`
+	stmtGame, err := tx.PrepareContext(ctx, `
 		INSERT INTO games (
-			event, site, date, round, white, black, result, 
+			event, site, date, round, white, black, result,
 			white_elo, black_elo, time_control, pgn_text, game_hash
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
@@ -224,8 +225,8 @@ func (db *DB) ImportPGN(filePath string) (int, []error) {
 	}
 	defer stmtGame.Close()
 
-	stmtTag, err := tx.Prepare(`
-		INSERT INTO tags (game_id, tag_name, tag_value) 
+	stmtTag, err := tx.PrepareContext(ctx, `
+		INSERT INTO tags (game_id, tag_name, tag_value)
 		VALUES (?, ?, ?)
 	`)
 	if err != nil {
@@ -334,9 +335,9 @@ func (db *DB) ImportPGN(filePath string) (int, []error) {
 }
 
 // GetGameCount returns the total number of games in the database
-func (db *DB) GetGameCount() (int, error) {
+func (db *DB) GetGameCount(ctx context.Context) (int, error) {
 	var count int
-	err := db.conn.QueryRow("SELECT COUNT(*) FROM games").Scan(&count)
+	err := db.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM games").Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get game count: %w", err)
 	}
@@ -344,7 +345,7 @@ func (db *DB) GetGameCount() (int, error) {
 }
 
 // SearchGames searches for games matching the specified criteria
-func (db *DB) SearchGames(criteria map[string]string, limit, offset int) ([]map[string]interface{}, error) {
+func (db *DB) SearchGames(ctx context.Context, criteria map[string]string, limit, offset int) ([]map[string]interface{}, error) {
 	// Build the query
 	query := "SELECT id, event, site, date, white, black, result FROM games WHERE 1=1"
 	var args []interface{}
@@ -363,7 +364,7 @@ func (db *DB) SearchGames(criteria map[string]string, limit, offset int) ([]map[
 	args = append(args, limit, offset)
 	
 	// Execute query
-	rows, err := db.conn.Query(query, args...)
+	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search games: %w", err)
 	}
@@ -400,9 +401,9 @@ func (db *DB) SearchGames(criteria map[string]string, limit, offset int) ([]map[
 }
 
 // GetGameByID retrieves a game by its ID
-func (db *DB) GetGameByID(id int) (map[string]interface{}, error) {
+func (db *DB) GetGameByID(ctx context.Context, id int) (map[string]interface{}, error) {
 	// Query the game
-	row := db.conn.QueryRow("SELECT * FROM games WHERE id = ?", id)
+	row := db.conn.QueryRowContext(ctx, "SELECT * FROM games WHERE id = ?", id)
 	
 	var gameID int
 	var event, site, date, round, white, black, result string
@@ -439,7 +440,7 @@ func (db *DB) GetGameByID(id int) (map[string]interface{}, error) {
 	}
 	
 	// Get all tags
-	rows, err := db.conn.Query("SELECT tag_name, tag_value FROM tags WHERE game_id = ?", id)
+	rows, err := db.conn.QueryContext(ctx, "SELECT tag_name, tag_value FROM tags WHERE game_id = ?", id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tags: %w", err)
 	}
@@ -464,9 +465,9 @@ func (db *DB) GetGameByID(id int) (map[string]interface{}, error) {
 }
 
 // ClearGames removes all games from the database
-func (db *DB) ClearGames() error {
+func (db *DB) ClearGames(ctx context.Context) error {
 	// Begin transaction
-	tx, err := db.conn.Begin()
+	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -521,10 +522,10 @@ type PlayerStats struct {
 }
 
 // GetPlayerStats retrieves statistics for all players in the database
-func (db *DB) GetPlayerStats() ([]PlayerStats, error) {
+func (db *DB) GetPlayerStats(ctx context.Context) ([]PlayerStats, error) {
 	// Query all games in the database
-	rows, err := db.conn.Query(`
-		SELECT white, black, result 
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT white, black, result
 		FROM games
 		WHERE white != '' AND black != ''
 	`)

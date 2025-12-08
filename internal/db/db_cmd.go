@@ -49,7 +49,7 @@ func ImportCommand(c *cli.Context) error {
 	defer db.Close()
 
 	// Get start count
-	startCount, err := db.GetGameCount()
+	startCount, err := db.GetGameCount(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to get initial game count: %w", err)
 	}
@@ -75,7 +75,7 @@ func ImportCommand(c *cli.Context) error {
 			}
 			
 			fmt.Printf("Importing file: %s\n", path)
-			imported, errors := db.ImportPGN(path)
+			imported, errors := db.ImportPGN(c.Context, path)
 			totalImported += imported
 			allErrors = append(allErrors, errors...)
 			
@@ -105,7 +105,7 @@ func ImportCommand(c *cli.Context) error {
 	} else {
 		// Import single file
 		fmt.Printf("Importing PGN file: %s\n", pgnPath)
-		imported, errors := db.ImportPGN(pgnPath)
+		imported, errors := db.ImportPGN(c.Context, pgnPath)
 		
 		// Report import errors
 		if len(errors) > 0 {
@@ -181,7 +181,7 @@ func ImportCommand(c *cli.Context) error {
 	}
 
 	// Get end count
-	endCount, err := db.GetGameCount()
+	endCount, err := db.GetGameCount(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to get final game count: %w", err)
 	}
@@ -223,13 +223,13 @@ func ListCommand(c *cli.Context) error {
 	defer db.Close()
 	
 	// Get total count
-	count, err := db.GetGameCount()
+	count, err := db.GetGameCount(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to get game count: %w", err)
 	}
-	
+
 	// Search games
-	games, err := db.SearchGames(criteria, limit, offset)
+	games, err := db.SearchGames(c.Context, criteria, limit, offset)
 	if err != nil {
 		return fmt.Errorf("failed to search games: %w", err)
 	}
@@ -268,7 +268,7 @@ func ShowCommand(c *cli.Context) error {
 	defer db.Close()
 	
 	// Get the game
-	game, err := db.GetGameByID(id)
+	game, err := db.GetGameByID(c.Context, id)
 	if err != nil {
 		return fmt.Errorf("failed to get game: %w", err)
 	}
@@ -327,7 +327,7 @@ func ExportCommand(c *cli.Context) error {
 	// Export specific game or all games
 	if id > 0 {
 		// Export single game
-		game, err := db.GetGameByID(id)
+		game, err := db.GetGameByID(c.Context, id)
 		if err != nil {
 			return fmt.Errorf("failed to get game: %w", err)
 		}
@@ -373,19 +373,19 @@ func ClearCommand(c *cli.Context) error {
 	defer db.Close()
 	
 	// Get initial count
-	count, err := db.GetGameCount()
+	count, err := db.GetGameCount(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to get initial game count: %w", err)
 	}
-	
+
 	if count == 0 {
 		fmt.Println("Database is already empty")
 		return nil
 	}
-	
+
 	// Clear all games
 	fmt.Println("Clearing all games from database...")
-	if err := db.ClearGames(); err != nil {
+	if err := db.ClearGames(c.Context); err != nil {
 		return fmt.Errorf("failed to clear games: %w", err)
 	}
 	
@@ -408,19 +408,19 @@ func StatsCommand(c *cli.Context) error {
 	defer db.Close()
 	
 	// Get game count
-	count, err := db.GetGameCount()
+	count, err := db.GetGameCount(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to get game count: %w", err)
 	}
-	
+
 	if count == 0 {
 		fmt.Println("Database is empty")
 		return nil
 	}
-	
+
 	// Get player statistics
 	fmt.Println("Calculating player statistics...")
-	stats, err := db.GetPlayerStats()
+	stats, err := db.GetPlayerStats(c.Context)
 	if err != nil {
 		return fmt.Errorf("failed to get player statistics: %w", err)
 	}
