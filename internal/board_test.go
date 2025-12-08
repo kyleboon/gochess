@@ -293,6 +293,52 @@ func TestHasInsufficientMaterial(t *testing.T) {
 			fen:      "4k3/8/8/8/8/8/8/4KQ2 w - - 0 1",
 			expected: false, // Queen can deliver mate
 		},
+		// Test cases for BLACK pieces (symmetric to white piece tests above)
+		{
+			name:     "King and black Knight vs King",
+			fen:      "4k1n1/8/8/8/8/8/8/4K3 w - - 0 1",
+			expected: true,
+		},
+		{
+			name:     "King and black Bishop vs King",
+			fen:      "4k1b1/8/8/8/8/8/8/4K3 w - - 0 1",
+			expected: true,
+		},
+		{
+			name:     "King vs King and two black Knights",
+			fen:      "4k1n1/6n1/8/8/8/8/8/4K3 w - - 0 1",
+			expected: false, // Two knights can force mate
+		},
+		{
+			name:     "King vs King and black Pawn",
+			fen:      "4k3/4p3/8/8/8/8/8/4K3 w - - 0 1",
+			expected: false, // Pawn can promote
+		},
+		{
+			name:     "King vs King and black Rook",
+			fen:      "4kr2/8/8/8/8/8/8/4K3 w - - 0 1",
+			expected: false, // Rook can deliver mate
+		},
+		{
+			name:     "King vs King and black Queen",
+			fen:      "4kq2/8/8/8/8/8/8/4K3 w - - 0 1",
+			expected: false, // Queen can deliver mate
+		},
+		{
+			name:     "King and black Bishop vs King and white Bishop (same color squares)",
+			fen:      "4k1b1/8/8/8/8/8/5B2/4K3 w - - 0 1",
+			expected: true,
+		},
+		{
+			name:     "King and black Bishop vs King and white Bishop (different color squares)",
+			fen:      "4k2b/8/8/8/8/8/5B2/4K3 w - - 0 1",
+			expected: true,
+		},
+		{
+			name:     "King and black Bishop + black Knight vs King",
+			fen:      "4kbn1/8/8/8/8/8/8/4K3 w - - 0 1",
+			expected: false, // Bishop and knight can deliver mate
+		},
 	}
 
 	for _, tt := range tests {

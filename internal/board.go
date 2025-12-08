@@ -353,14 +353,14 @@ func (b *Board) HasInsufficientMaterial() bool {
 		if piece.piece == BR || piece.piece == BP || piece.piece == BQ {
 			return false
 		}
-		if piece.piece == WB {
+		if piece.piece == BB {
 			if piece.sq.Color() == 0 {
 				blackHasLightColoredBishop = true
 			} else {
 				blackHasDarkColoredBishop = true
 			}
 		}
-		if piece.piece == WN {
+		if piece.piece == BN {
 			blackKnightCount++
 		}
 	}
