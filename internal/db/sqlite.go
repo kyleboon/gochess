@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,32 +13,49 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/kyleboon/gochess/internal/logging"
 	"github.com/kyleboon/gochess/internal/pgn"
 )
 
 // DB represents a SQLite database connection for chess data
 type DB struct {
-	conn *sql.DB
+	conn   *sql.DB
+	logger *slog.Logger
 }
 
 // New creates a new SQLite database connection
 func New(dbPath string) (*DB, error) {
+	return NewWithLogger(dbPath, logging.Default())
+}
+
+// NewWithLogger creates a new SQLite database connection with a custom logger
+func NewWithLogger(dbPath string, logger *slog.Logger) (*DB, error) {
+	logger.Debug("opening database", "path", dbPath)
+
 	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		logger.Error("failed to create database directory", "path", dbPath, "error", err)
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	conn, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
+		logger.Error("failed to open database connection", "path", dbPath, "error", err)
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	db := &DB{conn: conn}
+	db := &DB{
+		conn:   conn,
+		logger: logger,
+	}
+
 	if err := db.createTables(); err != nil {
 		conn.Close()
+		logger.Error("failed to create database tables", "error", err)
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
+	logger.Info("database opened successfully", "path", dbPath)
 	return db, nil
 }
 
@@ -245,10 +263,12 @@ func insertGameRecord(ctx context.Context, tx *sql.Tx, stmtGame, stmtTag *sql.St
 
 // ImportPGN imports games from a PGN file into the database
 func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
+	db.logger.Info("starting PGN import", "file", filePath)
 	allErrors := make([]error, 0)
 
 	// Parse PGN file using our adapter that handles different PGN formats and preserves the move text
 	pgnData, parseErrors := ParsePGNFileWithMoves(filePath)
+	db.logger.Debug("PGN file parsed", "file", filePath, "parseErrors", len(parseErrors))
 
 	// Process PGN parsing errors
 	if len(parseErrors) > 0 {
@@ -257,6 +277,7 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 
 	// Check if we parsed any games
 	if pgnData.PgnDB == nil || len(pgnData.PgnDB.Games) == 0 {
+		db.logger.Warn("no games found in PGN file", "file", filePath, "errors", len(allErrors))
 		if len(allErrors) > 0 { // If there were parse errors, return them
 			return 0, allErrors
 		}
@@ -268,13 +289,16 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 	// Get parsed games and their complete text
 	pgnDB := pgnData.PgnDB
 	gameTexts := pgnData.GameTexts
+	db.logger.Debug("games parsed successfully", "file", filePath, "totalGames", len(pgnDB.Games))
 
 	// Begin transaction
 	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
+		db.logger.Error("failed to begin transaction", "error", err)
 		allErrors = append(allErrors, &PGNImportError{OriginalError: fmt.Errorf("failed to begin transaction: %w", err), PGNText: ""})
 		return 0, allErrors
 	}
+	db.logger.Debug("transaction started")
 	defer func() {
 		if err := recover(); err != nil {
 			tx.Rollback()
@@ -359,13 +383,16 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 	}
 
 	// Commit transaction
+	db.logger.Debug("committing transaction", "importedGames", importedCount, "errors", len(allErrors))
 	err = tx.Commit()
 	if err != nil {
+		db.logger.Error("failed to commit transaction", "error", err, "importedGames", importedCount)
 		tx.Rollback()
 		allErrors = append(allErrors, &PGNImportError{OriginalError: fmt.Errorf("failed to commit transaction: %w", err), PGNText: ""})
 		return importedCount, allErrors
 	}
 
+	db.logger.Info("PGN import completed", "file", filePath, "imported", importedCount, "errors", len(allErrors))
 	return importedCount, allErrors
 }
 
@@ -374,17 +401,21 @@ func (db *DB) GetGameCount(ctx context.Context) (int, error) {
 	var count int
 	err := db.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM games").Scan(&count)
 	if err != nil {
+		db.logger.Error("failed to get game count", "error", err)
 		return 0, fmt.Errorf("failed to get game count: %w", err)
 	}
+	db.logger.Debug("game count retrieved", "count", count)
 	return count, nil
 }
 
 // SearchGames searches for games matching the specified criteria
 func (db *DB) SearchGames(ctx context.Context, criteria map[string]string, limit, offset int) ([]map[string]interface{}, error) {
+	db.logger.Debug("searching games", "criteria", criteria, "limit", limit, "offset", offset)
+
 	// Build the query
 	query := "SELECT id, event, site, date, white, black, result FROM games WHERE 1=1"
 	var args []interface{}
-	
+
 	// Add search criteria
 	for field, value := range criteria {
 		switch field {
@@ -393,14 +424,15 @@ func (db *DB) SearchGames(ctx context.Context, criteria map[string]string, limit
 			args = append(args, "%"+value+"%")
 		}
 	}
-	
+
 	// Add limit and offset
 	query += " ORDER BY date DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
-	
+
 	// Execute query
 	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
+		db.logger.Error("failed to execute search query", "error", err)
 		return nil, fmt.Errorf("failed to search games: %w", err)
 	}
 	defer rows.Close()
@@ -429,9 +461,11 @@ func (db *DB) SearchGames(ctx context.Context, criteria map[string]string, limit
 	}
 	
 	if err := rows.Err(); err != nil {
+		db.logger.Error("error iterating search results", "error", err)
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
-	
+
+	db.logger.Debug("search completed", "resultsFound", len(games))
 	return games, nil
 }
 

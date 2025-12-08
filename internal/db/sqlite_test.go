@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kyleboon/gochess/internal/logging"
 	"github.com/kyleboon/gochess/internal/pgn"
 )
 
@@ -17,7 +18,7 @@ func TestImportPGN_WithFEN(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	db, err := New(tempDir + "/test.db")
+	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
@@ -211,7 +212,7 @@ func TestCheckDuplicateGame(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	db, err := New(tempDir + "/test.db")
+	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
@@ -287,7 +288,7 @@ func TestInsertGameRecord(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	db, err := New(tempDir + "/test.db")
+	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
