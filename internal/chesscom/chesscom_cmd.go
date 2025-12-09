@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kyleboon/gochess/internal/config"
 	"github.com/kyleboon/gochess/internal/db"
 	"github.com/urfave/cli/v2"
 )
@@ -389,4 +390,102 @@ func parseArchiveMonth(monthStr string) (int, error) {
 func ConvertToDatabase(ctx context.Context, username string, year, month int) (*GamesResponse, error) {
 	client := NewClient()
 	return client.GetPlayerGames(ctx, username, year, month)
+}
+
+// ImportFromConfig imports games using configuration settings
+// If lastImport is non-zero, only games from months since that time are imported
+func ImportFromConfig(ctx context.Context, cfg *config.Config, database *db.DB, verbose bool) (int, error) {
+	if cfg.ChessCom == nil || cfg.ChessCom.Username == "" {
+		return 0, fmt.Errorf("no Chess.com user configured")
+	}
+
+	username := cfg.ChessCom.Username
+	client := NewClient()
+
+	// Fetch all available archives
+	fmt.Printf("Fetching available archives for %s on Chess.com...\n", username)
+	archives, err := client.GetArchivedMonths(ctx, username)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch archives: %w", err)
+	}
+
+	// Get last import time
+	lastImport, hasLastImport := cfg.GetLastImport("chesscom", username)
+
+	totalGames := 0
+	processedMonths := 0
+
+	// Process each archive
+	for _, archiveURL := range archives.Archives {
+		// Extract year and month from the URL
+		parts := strings.Split(archiveURL, "/")
+		if len(parts) < 2 {
+			continue
+		}
+
+		archiveYear, err := parseArchiveYear(parts[len(parts)-2])
+		if err != nil {
+			fmt.Printf("Warning: Could not parse year from archive URL %s: %v\n", archiveURL, err)
+			continue
+		}
+
+		archiveMonth, err := parseArchiveMonth(parts[len(parts)-1])
+		if err != nil {
+			fmt.Printf("Warning: Could not parse month from archive URL %s: %v\n", archiveURL, err)
+			continue
+		}
+
+		// Skip months before last import
+		if hasLastImport {
+			archiveTime := time.Date(archiveYear, time.Month(archiveMonth), 1, 0, 0, 0, 0, time.UTC)
+			// Only process months that are >= the month of last import
+			if archiveTime.Before(time.Date(lastImport.Year(), lastImport.Month(), 1, 0, 0, 0, 0, time.UTC)) {
+				continue
+			}
+		}
+
+		if hasLastImport && processedMonths == 0 {
+			fmt.Printf("Fetching Chess.com games for %s since %s...\n", username, lastImport.Format("2006-01-02 15:04:05"))
+		} else if !hasLastImport && processedMonths == 0 {
+			fmt.Printf("Fetching all Chess.com games for %s...\n", username)
+		}
+
+		// Download and process games for this month
+		monthlyGames, err := downloadAndImportMonthlyGames(
+			ctx,
+			username,
+			archiveYear,
+			archiveMonth,
+			"pgn",
+			"",
+			"",
+			true,
+			verbose,
+			database,
+		)
+
+		if err != nil {
+			fmt.Printf("Error processing %d/%02d: %v\n", archiveYear, archiveMonth, err)
+			continue
+		}
+
+		totalGames += monthlyGames
+		processedMonths++
+	}
+
+	if processedMonths == 0 {
+		fmt.Printf("No new games found for %s on Chess.com\n", username)
+		return 0, nil
+	}
+
+	if totalGames > 0 {
+		fmt.Printf("Successfully imported %d games from Chess.com\n", totalGames)
+		// Update last import time
+		cfg.SetLastImport("chesscom", username, time.Now())
+		if err := cfg.SaveDefault(); err != nil {
+			return totalGames, fmt.Errorf("imported games but failed to save last import time: %w", err)
+		}
+	}
+
+	return totalGames, nil
 }

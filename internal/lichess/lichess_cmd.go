@@ -1,12 +1,14 @@
 package lichess
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/kyleboon/gochess/internal/config"
 	"github.com/kyleboon/gochess/internal/db"
 	"github.com/urfave/cli/v2"
 )
@@ -231,4 +233,88 @@ func parseTimeString(timeStr string) (time.Time, error) {
 	}
 
 	return time.Time{}, fmt.Errorf("unable to parse time string %q (supported formats: YYYY-MM-DD, YYYY-MM, YYYY)", timeStr)
+}
+
+// ImportFromConfig imports games using configuration settings
+// If lastImport is non-zero, only games since that time are imported
+func ImportFromConfig(ctx context.Context, cfg *config.Config, database *db.DB, verbose bool) (int, error) {
+	if cfg.Lichess == nil || cfg.Lichess.Username == "" {
+		return 0, fmt.Errorf("no Lichess user configured")
+	}
+
+	username := cfg.Lichess.Username
+	client := NewClient()
+
+	// Set API token if available
+	if cfg.Lichess.APIToken != "" {
+		client.SetAPIToken(cfg.Lichess.APIToken)
+	}
+
+	// Build parameters
+	params := DefaultGamesParams(username)
+
+	// Get last import time
+	lastImport, hasLastImport := cfg.GetLastImport("lichess", username)
+	if hasLastImport {
+		// Add 1 second to avoid re-importing the last game
+		sinceTime := lastImport.Add(1 * time.Second)
+		sinceMillis := sinceTime.UnixMilli()
+		params.Since = &sinceMillis
+		fmt.Printf("Fetching Lichess games for %s since %s...\n", username, lastImport.Format("2006-01-02 15:04:05"))
+	} else {
+		fmt.Printf("Fetching all Lichess games for %s...\n", username)
+	}
+
+	// Get the PGN data
+	pgn, err := client.GetPlayerGamesPGN(ctx, params)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch games: %w", err)
+	}
+
+	if pgn == "" {
+		fmt.Printf("No new games found for %s on Lichess\n", username)
+		return 0, nil
+	}
+
+	// Create a temporary file to store the PGN for import
+	tmpfile, err := os.CreateTemp("", "lichess-*.pgn")
+	if err != nil {
+		return 0, fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	tmpPath := tmpfile.Name()
+	defer os.Remove(tmpPath) // Clean up
+
+	// Write PGN to temporary file
+	if _, err := tmpfile.WriteString(pgn); err != nil {
+		tmpfile.Close()
+		return 0, fmt.Errorf("failed to write to temporary file: %w", err)
+	}
+	tmpfile.Close()
+
+	// Import the PGN file
+	count, errors := database.ImportPGN(ctx, tmpPath)
+
+	// Print import results
+	if len(errors) > 0 && verbose {
+		fmt.Printf("Encountered %d errors during Lichess import:\n", len(errors))
+		for i, err := range errors {
+			fmt.Printf("  Error %d: %s\n", i+1, err)
+			if pgnErr, ok := err.(*db.PGNImportError); ok && pgnErr.PGNText != "" {
+				fmt.Printf("    PGN: %s\n", pgnErr.PGNText)
+			}
+		}
+	} else if len(errors) > 0 {
+		fmt.Printf("Encountered %d errors during Lichess import. Use --verbose to see details.\n", len(errors))
+	}
+
+	if count > 0 {
+		fmt.Printf("Successfully imported %d games from Lichess\n", count)
+		// Update last import time
+		cfg.SetLastImport("lichess", username, time.Now())
+		if err := cfg.SaveDefault(); err != nil {
+			return count, fmt.Errorf("imported games but failed to save last import time: %w", err)
+		}
+	}
+
+	return count, nil
 }

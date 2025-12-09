@@ -1,5 +1,25 @@
 # GoChess TODO List
 
+## ✅ Recently Completed
+
+### Configuration & Import Simplification (2024-12-09)
+- [x] Create configuration file system (`~/.gochess/config.yaml`)
+  - Store usernames, API tokens, database path
+  - Track last import timestamps per platform/user
+- [x] Add unified `gochess import` command
+  - Automatically imports from all configured sources
+  - Incremental updates (only new games since last import)
+  - Single command replaces complex download workflows
+- [x] Add `gochess config` command suite
+  - `config init` - Interactive configuration setup
+  - `config show` - Display current configuration
+  - `config add-user` - Add tracked users
+  - `config remove-user` - Remove tracked users
+- [x] Implement smart incremental imports
+  - Lichess: Uses `since` parameter for date-based filtering
+  - Chess.com: Skips months before last import date
+  - Updates last import timestamp after successful import
+
 ## 🔥 High Priority - Core Features
 
 ### Position-Based Search

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kyleboon/gochess/internal/chesscom"
+	"github.com/kyleboon/gochess/internal/config"
 	"github.com/kyleboon/gochess/internal/db"
 	"github.com/kyleboon/gochess/internal/lichess"
 	"github.com/urfave/cli/v2"
@@ -27,6 +28,23 @@ func main() {
 		Name:  "gochess",
 		Usage: "Chess utilities and analysis tools",
 		Commands: []*cli.Command{
+			{
+				Name:  "import",
+				Usage: "Import games from all configured sources",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "verbose",
+						Aliases: []string{"v"},
+						Usage:   "Show detailed error messages",
+					},
+					&cli.BoolFlag{
+						Name:    "full",
+						Aliases: []string{"f"},
+						Usage:   "Import full history (ignore last import time)",
+					},
+				},
+				Action: ImportCommand,
+			},
 			{
 				Name:  "chesscom",
 				Usage: "Interact with Chess.com API",
@@ -172,6 +190,59 @@ func main() {
 							},
 						},
 						Action: lichess.DownloadGames,
+					},
+				},
+			},
+			{
+				Name:  "config",
+				Usage: "Manage gochess configuration",
+				Subcommands: []*cli.Command{
+					{
+						Name:  "init",
+						Usage: "Initialize configuration interactively",
+						Action: config.InitCommand,
+					},
+					{
+						Name:  "show",
+						Usage: "Show current configuration",
+						Action: config.ShowCommand,
+					},
+					{
+						Name:  "add-user",
+						Usage: "Add a user to track",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:     "platform",
+								Aliases:  []string{"p"},
+								Usage:    "Platform (chesscom or lichess)",
+								Required: true,
+							},
+							&cli.StringFlag{
+								Name:     "username",
+								Aliases:  []string{"u"},
+								Usage:    "Username to track",
+								Required: true,
+							},
+							&cli.StringFlag{
+								Name:    "token",
+								Aliases: []string{"t"},
+								Usage:   "API token (Lichess only, optional)",
+							},
+						},
+						Action: config.AddUserCommand,
+					},
+					{
+						Name:  "remove-user",
+						Usage: "Remove a tracked user",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:     "platform",
+								Aliases:  []string{"p"},
+								Usage:    "Platform (chesscom or lichess)",
+								Required: true,
+							},
+						},
+						Action: config.RemoveUserCommand,
 					},
 				},
 			},
