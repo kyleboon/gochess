@@ -8,6 +8,7 @@ GoChess is a chess library and toolset written in Go that provides:
 - FEN (Forsyth-Edwards Notation) support
 - SQLite-based game database with import/export capabilities
 - Chess.com API integration for downloading game archives
+- Lichess API integration for downloading game archives
 - Terminal UI (TUI) for browsing and playing through games
 - CLI tools for game management and analysis
 
@@ -41,6 +42,7 @@ gochess/
 │   ├── db/             # SQLite database layer
 │   ├── pgn/            # PGN parsing and database
 │   ├── chesscom/       # Chess.com API client
+│   ├── lichess/        # Lichess API client
 │   └── logging/        # Structured logging configuration
 ├── testdata/           # Test fixtures (PGN files, FEN positions)
 └── README.md
@@ -141,11 +143,11 @@ func TestValidateGameTags(t *testing.T) {
 
 ### Recently Completed (Latest Session)
 
-1. **Critical Bug Fix**: Fixed `HasInsufficientMaterial()` checking wrong piece constants for black
-2. **Context Support**: Added `context.Context` to all HTTP and DB operations
-3. **Code Refactoring**: Split `ImportPGN()` into 4 testable functions
-4. **Structured Logging**: Implemented `log/slog` throughout internal packages
-5. **Rate Limit Handling**: Added HTTP 429 detection with exponential backoff retry
+1. **Lichess Integration**: Complete API client for downloading games from Lichess
+2. **CLI Commands**: Added `gochess lichess download` with comprehensive filtering options
+3. **Date Range Support**: Lichess uses date ranges (since/until) instead of monthly archives
+4. **API Token Support**: Optional authentication for private games and higher rate limits
+5. **Comprehensive Tests**: Full test coverage for Lichess client with 8 test cases
 
 ### Current State
 
@@ -172,6 +174,13 @@ func TestValidateGameTags(t *testing.T) {
 - Default: 3 retries, starting at 1s, max 30s backoff
 - No internal mutex - multiple client instances may conflict
 - Solution: Make requests sequentially (current behavior in `--all-history`)
+
+### 1a. **Lichess API Rate Limiting**
+⚠️ **~120 requests per minute with API token**
+- The client automatically retries with exponential backoff (same as Chess.com)
+- Default: 3 retries, starting at 1s, max 30s backoff
+- Uses date range filtering instead of monthly archives
+- Optional API token for private games and higher rate limits
 
 ### 2. **PGN Import Behavior**
 - **Duplicate Detection**: Uses hash of moves + metadata
@@ -271,11 +280,19 @@ go test -run TestImportPGN ./internal/db  # Run specific test
 
 ### Adding a New Chess.com API Endpoint
 
-1. Define response struct in `internal/chesscom/types.go`
+1. Define response struct in `internal/chesscom/models.go`
 2. Add method to `Client` in `internal/chesscom/client.go`
 3. Use `doRequestWithRetry()` for automatic 429 handling
 4. Log with `c.logger.Info()` before/after requests
 5. Add tests in `internal/chesscom/client_test.go` with `httptest`
+
+### Adding a New Lichess API Endpoint
+
+1. Define request params in `internal/lichess/models.go` (if needed)
+2. Add method to `Client` in `internal/lichess/client.go`
+3. Use `doRequestWithRetry()` for automatic 429 handling
+4. Log with `c.logger.Info()` before/after requests
+5. Add tests in `internal/lichess/client_test.go` with `httptest`
 
 ### Adding a New CLI Command
 
@@ -320,6 +337,7 @@ go test -run TestImportPGN ./internal/db  # Run specific test
 | Parse PGN files | `internal/pgn/parse.go` |
 | Database operations | `internal/db/sqlite.go` |
 | Chess.com API | `internal/chesscom/client.go` |
+| Lichess API | `internal/lichess/client.go` |
 | Logging config | `internal/logging/logger.go` |
 | CLI commands | `cmd/gochess/main.go` |
 | TUI screens | `cmd/chesstui/*.go` |
@@ -345,4 +363,4 @@ go test -run TestImportPGN ./internal/db  # Run specific test
 
 ---
 
-*Last Updated*: 2025-12-09 (after completing high-priority code quality improvements)
+*Last Updated*: 2025-12-09 (after adding Lichess integration)

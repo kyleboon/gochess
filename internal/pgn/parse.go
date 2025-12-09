@@ -143,6 +143,12 @@ func (p *parser) readGame() (game *Game, err error) {
 	if len(tags) == 0 {
 		p.panicf("no game tags found")
 	}
+	// Ensure FEN tag exists - add standard starting position if missing
+	// This is needed because we ignore FEN tags from the PGN file to avoid
+	// using end positions, but NewGame requires a FEN tag to be present.
+	if _, hasFen := tags["FEN"]; !hasFen {
+		tags["FEN"] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+	}
 	// Parsing and validating the moves in the movetext section is
 	// postponed until parseMoves is called. Here we just quickly scan the
 	// movetext to get some additional game information: the number of

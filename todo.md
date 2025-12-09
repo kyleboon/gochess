@@ -35,24 +35,25 @@
   - Opening frequency distribution
 
 ### Lichess Integration
-- [ ] Research Lichess API endpoints
+- [x] Research Lichess API endpoints
   - Games export endpoint: `https://lichess.org/api/games/user/{username}`
-  - Archive endpoint (similar to Chess.com)
-  - Rate limiting rules (different from Chess.com)
-- [ ] Create `internal/lichess` package
+  - Uses date range filtering instead of monthly archives
+  - Rate limiting: ~120 requests/minute with API token
+- [x] Create `internal/lichess` package
   - Mirror structure of `internal/chesscom`
   - Client with logger and retry logic
   - Support for downloading game archives
-- [ ] Implement Lichess API client
-  - `GetPlayerGames()` - Download games in PGN or JSON format
-  - `GetArchivedMonths()` - List available archives
-  - Handle authentication (API token support for private games?)
+- [x] Implement Lichess API client
+  - `GetPlayerGamesPGN()` - Download games in PGN format
+  - Supports date range filtering (since/until timestamps)
+  - Handle authentication (API token support for private games)
   - Implement rate limiting/retry (429 detection like Chess.com)
-- [ ] Add Lichess CLI commands
-  - `gochess lichess list-archives --username <user>`
-  - `gochess lichess download --username <user> --year 2024 --month 12`
-  - `gochess lichess download --username <user> --all-history --import-db`
-- [ ] Add Lichess support to TUI
+- [x] Add Lichess CLI commands
+  - `gochess lichess download --username <user>` with date range and filter options
+  - Supports `--since`, `--until`, `--max`, `--vs`, `--rated`, `--perf-type`, `--color`
+  - Supports `--import-db` for direct database import
+  - Supports `--api-token` for authenticated requests
+- [ ] Add Lichess support to TUI (optional)
   - Similar to Chess.com browser
   - Switch between Chess.com/Lichess sources
 

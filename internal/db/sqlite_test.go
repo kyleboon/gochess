@@ -37,6 +37,43 @@ func TestImportPGN_WithFEN(t *testing.T) {
 	}
 }
 
+func TestImportPGN_NoFEN(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "gochess-test-db-")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
+	if err != nil {
+		t.Fatalf("failed to create test database: %v", err)
+	}
+	defer db.Close()
+
+	// Test with a Lichess PGN file that has no FEN tag
+	// This simulates the real-world scenario that was causing errors
+	pgnPath := "../../testdata/lichess_no_fen.pgn"
+	count, errors := db.ImportPGN(context.Background(), pgnPath)
+
+	if len(errors) != 0 {
+		t.Fatalf("expected 0 errors, but got %d: %v", len(errors), errors)
+	}
+
+	if count != 1 {
+		t.Fatalf("expected 1 game to be imported, but got %d", count)
+	}
+
+	// Verify the game was imported with the correct FEN (standard starting position)
+	games, err := db.SearchGames(context.Background(), map[string]string{}, 10, 0)
+	if err != nil {
+		t.Fatalf("failed to search games: %v", err)
+	}
+
+	if len(games) != 1 {
+		t.Fatalf("expected 1 game in database, but found %d", len(games))
+	}
+}
+
 // TestValidateGameTags tests the validateGameTags function
 func TestValidateGameTags(t *testing.T) {
 	tests := []struct {

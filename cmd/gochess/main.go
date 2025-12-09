@@ -8,6 +8,7 @@ import (
 
 	"github.com/kyleboon/gochess/internal/chesscom"
 	"github.com/kyleboon/gochess/internal/db"
+	"github.com/kyleboon/gochess/internal/lichess"
 	"github.com/urfave/cli/v2"
 )
 
@@ -98,6 +99,79 @@ func main() {
 							},
 						},
 						Action: chesscom.DownloadGames,
+					},
+				},
+			},
+			{
+				Name:  "lichess",
+				Usage: "Interact with Lichess API",
+				Subcommands: []*cli.Command{
+					{
+						Name:  "download",
+						Usage: "Download games for a user",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:     "username",
+								Aliases:  []string{"u"},
+								Usage:    "Lichess username",
+								Required: true,
+							},
+							&cli.StringFlag{
+								Name:    "since",
+								Aliases: []string{"s"},
+								Usage:   "Download games since this date (YYYY-MM-DD, YYYY-MM, or YYYY)",
+							},
+							&cli.StringFlag{
+								Name:    "until",
+								Usage:   "Download games until this date (YYYY-MM-DD, YYYY-MM, or YYYY)",
+							},
+							&cli.IntFlag{
+								Name:    "max",
+								Aliases: []string{"n"},
+								Usage:   "Maximum number of games to download",
+							},
+							&cli.StringFlag{
+								Name:  "vs",
+								Usage: "Filter games against a specific opponent",
+							},
+							&cli.StringFlag{
+								Name:  "rated",
+								Usage: "Filter by rated games (true/false)",
+							},
+							&cli.StringFlag{
+								Name:  "perf-type",
+								Usage: "Filter by game type (ultraBullet, bullet, blitz, rapid, classical, correspondence)",
+							},
+							&cli.StringFlag{
+								Name:  "color",
+								Usage: "Filter by color (white/black)",
+							},
+							&cli.StringFlag{
+								Name:    "output",
+								Aliases: []string{"o"},
+								Usage:   "Output file path (default: stdout)",
+							},
+							&cli.BoolFlag{
+								Name:  "import-db",
+								Usage: "Import games directly into the database",
+							},
+							&cli.StringFlag{
+								Name:    "database",
+								Aliases: []string{"db"},
+								Usage:   "Path to database file (for import-db option)",
+								Value:   "~/.gochess/games.db",
+							},
+							&cli.StringFlag{
+								Name:  "api-token",
+								Usage: "Lichess API token for private games (optional)",
+							},
+							&cli.BoolFlag{
+								Name:    "verbose",
+								Aliases: []string{"v"},
+								Usage:   "Show detailed error messages",
+							},
+						},
+						Action: lichess.DownloadGames,
 					},
 				},
 			},

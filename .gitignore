@@ -30,3 +30,6 @@ go.work
 ._*
 .Spotlight-V100
 .Trashes
+
+chesstui
+gochess
