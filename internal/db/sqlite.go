@@ -636,6 +636,13 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 	// Map to track player statistics
 	playerStats := make(map[string]*PlayerStats)
 
+	// Create a set of filtered players for quick lookup
+	filterSet := make(map[string]bool)
+	for _, player := range players {
+		filterSet[player] = true
+	}
+	isFiltered := len(players) > 0
+
 	// Process each game
 	for rows.Next() {
 		var white, black, result string
@@ -643,33 +650,57 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 
-		// Initialize player stats if not yet tracked
-		if _, ok := playerStats[white]; !ok {
-			playerStats[white] = &PlayerStats{Name: white}
+		// When filtering, only track stats for the filtered players
+		trackWhite := !isFiltered || filterSet[white]
+		trackBlack := !isFiltered || filterSet[black]
+
+		// Initialize player stats if not yet tracked and should be tracked
+		if trackWhite {
+			if _, ok := playerStats[white]; !ok {
+				playerStats[white] = &PlayerStats{Name: white}
+			}
 		}
-		if _, ok := playerStats[black]; !ok {
-			playerStats[black] = &PlayerStats{Name: black}
+		if trackBlack {
+			if _, ok := playerStats[black]; !ok {
+				playerStats[black] = &PlayerStats{Name: black}
+			}
 		}
 
-		// Update game counts
-		playerStats[white].Games++
-		playerStats[white].WhiteGames++
-		playerStats[black].Games++
-		playerStats[black].BlackGames++
+		// Update game counts for tracked players
+		if trackWhite {
+			playerStats[white].Games++
+			playerStats[white].WhiteGames++
+		}
+		if trackBlack {
+			playerStats[black].Games++
+			playerStats[black].BlackGames++
+		}
 
 		// Update win/loss/draw counts based on result
 		switch result {
 		case "1-0": // White win
-			playerStats[white].Wins++
-			playerStats[white].WhiteWins++
-			playerStats[black].Losses++
+			if trackWhite {
+				playerStats[white].Wins++
+				playerStats[white].WhiteWins++
+			}
+			if trackBlack {
+				playerStats[black].Losses++
+			}
 		case "0-1": // Black win
-			playerStats[black].Wins++
-			playerStats[black].BlackWins++
-			playerStats[white].Losses++
+			if trackBlack {
+				playerStats[black].Wins++
+				playerStats[black].BlackWins++
+			}
+			if trackWhite {
+				playerStats[white].Losses++
+			}
 		case "1/2-1/2": // Draw
-			playerStats[white].Draws++
-			playerStats[black].Draws++
+			if trackWhite {
+				playerStats[white].Draws++
+			}
+			if trackBlack {
+				playerStats[black].Draws++
+			}
 		default: // Unknown result or ongoing game
 			// Skip updating win/loss/draw counts
 		}
