@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/kyleboon/gochess/internal/chesscom"
@@ -44,6 +45,35 @@ func main() {
 					},
 				},
 				Action: ImportCommand,
+			},
+			{
+				Name:    "stats",
+				Aliases: []string{"st"},
+				Usage:   "Show statistics for configured players",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:    "database",
+						Aliases: []string{"db"},
+						Usage:   "Path to database file",
+						Value:   "~/.gochess/games.db",
+					},
+					&cli.StringSliceFlag{
+						Name:    "player",
+						Aliases: []string{"p"},
+						Usage:   "Filter statistics for specific player(s) (can be used multiple times)",
+					},
+					&cli.BoolFlag{
+						Name:  "all",
+						Usage: "Show statistics for all players in database (not just configured users)",
+					},
+					&cli.StringFlag{
+						Name:    "format",
+						Aliases: []string{"f"},
+						Usage:   "Output format (table or csv)",
+						Value:   "table",
+					},
+				},
+				Action: statsCommand,
 			},
 			{
 				Name:  "chesscom",
@@ -438,31 +468,6 @@ func main() {
 						},
 						Action: db.ClearCommand,
 					},
-					{
-						Name:    "stats",
-						Aliases: []string{"st"},
-						Usage:   "Show win rate statistics for players in the database",
-						Flags: []cli.Flag{
-							&cli.StringFlag{
-								Name:    "database",
-								Aliases: []string{"db"},
-								Usage:   "Path to database file",
-								Value:   "~/.gochess/games.db",
-							},
-							&cli.StringFlag{
-								Name:    "player",
-								Aliases: []string{"p"},
-								Usage:   "Filter statistics for a specific player",
-							},
-							&cli.StringFlag{
-								Name:    "format",
-								Aliases: []string{"f"},
-								Usage:   "Output format (table or csv)",
-								Value:   "table",
-							},
-						},
-						Action: db.StatsCommand,
-					},
 				},
 			},
 		},
@@ -504,4 +509,155 @@ func analyzeAction(c *cli.Context) error {
 	fmt.Println("\n=== Running Example ===")
 
 	return nil
+}
+
+func statsCommand(c *cli.Context) error {
+	dbPath := expandPath(c.String("database"))
+	playerFilter := c.StringSlice("player")
+	showAll := c.Bool("all")
+	format := c.String("format")
+
+	// Load config to get configured users
+	cfg, err := config.LoadOrDefault()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Open database connection
+	fmt.Printf("Opening database at %s...\n", dbPath)
+	database, err := db.New(dbPath)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	defer database.Close()
+
+	// Get game count
+	count, err := database.GetGameCount(c.Context)
+	if err != nil {
+		return fmt.Errorf("failed to get game count: %w", err)
+	}
+
+	if count == 0 {
+		fmt.Println("Database is empty")
+		return nil
+	}
+
+	// Determine which players to show stats for
+	var players []string
+	if len(playerFilter) > 0 {
+		// User explicitly specified players
+		players = playerFilter
+	} else if !showAll {
+		// Use configured users by default
+		if cfg.ChessCom != nil && cfg.ChessCom.Username != "" {
+			players = append(players, cfg.ChessCom.Username)
+		}
+		if cfg.Lichess != nil && cfg.Lichess.Username != "" {
+			players = append(players, cfg.Lichess.Username)
+		}
+
+		if len(players) == 0 {
+			fmt.Println("No configured users found. Use --all to show all players or configure users with 'gochess config add-user'")
+			return nil
+		}
+	}
+	// else showAll is true, so players remains nil/empty and we get all players
+
+	// Get player statistics
+	fmt.Println("Calculating player statistics...")
+	var stats []db.PlayerStats
+	if len(players) > 0 {
+		stats, err = database.GetPlayerStatsFiltered(c.Context, players)
+	} else {
+		stats, err = database.GetPlayerStats(c.Context)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get player statistics: %w", err)
+	}
+
+	if len(stats) == 0 {
+		if len(players) > 0 {
+			fmt.Printf("No games found for players: %v\n", players)
+		} else {
+			fmt.Println("No player statistics available")
+		}
+		return nil
+	}
+
+	// Display statistics
+	fmt.Printf("Database contains %d games\n\n", count)
+
+	switch format {
+	case "csv":
+		// CSV output
+		fmt.Println("Name,Games,Wins,Losses,Draws,WinRate,WhiteGames,BlackGames,WhiteWins,BlackWins")
+		for _, s := range stats {
+			fmt.Printf("%s,%d,%d,%d,%d,%.1f%%,%d,%d,%d,%d\n",
+				s.Name, s.Games, s.Wins, s.Losses, s.Draws, s.WinRate,
+				s.WhiteGames, s.BlackGames, s.WhiteWins, s.BlackWins)
+		}
+
+	default:
+		// Table output (default)
+		fmt.Printf("%-20s %-6s %-6s %-6s %-6s %-8s %-6s %-6s\n",
+			"PLAYER", "GAMES", "WINS", "LOSSES", "DRAWS", "WIN RATE", "WHITE", "BLACK")
+		fmt.Println(repeatString("-", 72))
+
+		for _, s := range stats {
+			// Truncate long player names
+			name := s.Name
+			if len(name) > 20 {
+				name = name[:17] + "..."
+			}
+
+			fmt.Printf("%-20s %-6d %-6d %-6d %-6d %-7.1f%% %-6d %-6d\n",
+				name, s.Games, s.Wins, s.Losses, s.Draws, s.WinRate,
+				s.WhiteGames, s.BlackGames)
+		}
+
+		// Show detailed statistics if only showing one player
+		if len(stats) == 1 {
+			fmt.Printf("\nDetailed statistics for %s:\n", stats[0].Name)
+			fmt.Printf("  As White: %d games, %d wins (%.1f%%)\n",
+				stats[0].WhiteGames, stats[0].WhiteWins,
+				safeDiv(float64(stats[0].WhiteWins), float64(stats[0].WhiteGames))*100)
+			fmt.Printf("  As Black: %d games, %d wins (%.1f%%)\n",
+				stats[0].BlackGames, stats[0].BlackWins,
+				safeDiv(float64(stats[0].BlackWins), float64(stats[0].BlackGames))*100)
+		}
+	}
+
+	return nil
+}
+
+// expandPath expands the tilde in file paths to the user's home directory
+func expandPath(path string) string {
+	if path == "" {
+		return ""
+	}
+	if path[0] == '~' {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		return filepath.Join(home, path[1:])
+	}
+	return path
+}
+
+// repeatString repeats a string n times
+func repeatString(s string, n int) string {
+	result := ""
+	for i := 0; i < n; i++ {
+		result += s
+	}
+	return result
+}
+
+// safeDiv performs division but handles division by zero gracefully
+func safeDiv(a, b float64) float64 {
+	if b == 0 {
+		return 0
+	}
+	return a / b
 }

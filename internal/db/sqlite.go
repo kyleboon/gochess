@@ -592,27 +592,57 @@ type PlayerStats struct {
 
 // GetPlayerStats retrieves statistics for all players in the database
 func (db *DB) GetPlayerStats(ctx context.Context) ([]PlayerStats, error) {
-	// Query all games in the database
-	rows, err := db.conn.QueryContext(ctx, `
-		SELECT white, black, result
-		FROM games
-		WHERE white != '' AND black != ''
-	`)
+	return db.GetPlayerStatsFiltered(ctx, nil)
+}
+
+// GetPlayerStatsFiltered retrieves statistics for specific players in the database
+// If players is nil or empty, returns stats for all players
+func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]PlayerStats, error) {
+	// Build query based on whether we're filtering
+	var query string
+	var args []interface{}
+
+	if len(players) == 0 {
+		// Query all games
+		query = `
+			SELECT white, black, result
+			FROM games
+			WHERE white != '' AND black != ''
+		`
+	} else {
+		// Query games for specific players
+		placeholders := make([]string, len(players))
+		args = make([]interface{}, len(players))
+		for i, player := range players {
+			placeholders[i] = "?"
+			args[i] = player
+		}
+		playerList := strings.Join(placeholders, ",")
+		query = fmt.Sprintf(`
+			SELECT white, black, result
+			FROM games
+			WHERE (white IN (%s) OR black IN (%s))
+			AND white != '' AND black != ''
+		`, playerList, playerList)
+		args = append(args, args...) // Duplicate args for both IN clauses
+	}
+
+	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query games: %w", err)
 	}
 	defer rows.Close()
-	
+
 	// Map to track player statistics
 	playerStats := make(map[string]*PlayerStats)
-	
+
 	// Process each game
 	for rows.Next() {
 		var white, black, result string
 		if err := rows.Scan(&white, &black, &result); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
-		
+
 		// Initialize player stats if not yet tracked
 		if _, ok := playerStats[white]; !ok {
 			playerStats[white] = &PlayerStats{Name: white}
@@ -620,13 +650,13 @@ func (db *DB) GetPlayerStats(ctx context.Context) ([]PlayerStats, error) {
 		if _, ok := playerStats[black]; !ok {
 			playerStats[black] = &PlayerStats{Name: black}
 		}
-		
+
 		// Update game counts
 		playerStats[white].Games++
 		playerStats[white].WhiteGames++
 		playerStats[black].Games++
 		playerStats[black].BlackGames++
-		
+
 		// Update win/loss/draw counts based on result
 		switch result {
 		case "1-0": // White win
@@ -644,26 +674,26 @@ func (db *DB) GetPlayerStats(ctx context.Context) ([]PlayerStats, error) {
 			// Skip updating win/loss/draw counts
 		}
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
-	
+
 	// Calculate win rates and convert to slice
-	result := make([]PlayerStats, 0, len(playerStats))
+	results := make([]PlayerStats, 0, len(playerStats))
 	for _, stats := range playerStats {
 		// Calculate win rate
 		if stats.Games > 0 {
 			stats.WinRate = float64(stats.Wins) / float64(stats.Games) * 100.0
 		}
-		
-		result = append(result, *stats)
+
+		results = append(results, *stats)
 	}
-	
+
 	// Sort by number of games (most active players first)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Games > result[j].Games
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Games > results[j].Games
 	})
-	
-	return result, nil
+
+	return results, nil
 }
