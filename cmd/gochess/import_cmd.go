@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/kyleboon/gochess/internal/chesscom"
 	"github.com/kyleboon/gochess/internal/config"
 	"github.com/kyleboon/gochess/internal/db"
 	"github.com/kyleboon/gochess/internal/lichess"
+	"github.com/kyleboon/gochess/internal/logging"
 	"github.com/urfave/cli/v2"
 )
 
@@ -21,6 +23,15 @@ func ImportCommand(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
+
+	// Determine log level: CLI flag takes precedence over config file
+	logLevel := c.String("log-level")
+	if logLevel == "" {
+		logLevel = cfg.GetLogLevel()
+	}
+
+	// Create logger with the determined log level
+	logger := createLogger(logLevel)
 
 	// Check if any sources are configured
 	if !cfg.HasAnySource() {
@@ -37,7 +48,7 @@ func ImportCommand(c *cli.Context) error {
 
 	// Open database
 	fmt.Printf("Opening database at %s...\n", cfg.DatabasePath)
-	database, err := db.New(cfg.DatabasePath)
+	database, err := db.NewWithLogger(cfg.DatabasePath, logger)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
@@ -49,7 +60,7 @@ func ImportCommand(c *cli.Context) error {
 	// Import from Chess.com if configured
 	if cfg.ChessCom != nil && cfg.ChessCom.Username != "" {
 		fmt.Println("\n=== Importing from Chess.com ===")
-		count, err := chesscom.ImportFromConfig(c.Context, cfg, database, verbose)
+		count, err := chesscom.ImportFromConfig(c.Context, cfg, database, logger, verbose)
 		if err != nil {
 			fmt.Printf("Error importing from Chess.com: %v\n", err)
 			hasErrors = true
@@ -61,7 +72,7 @@ func ImportCommand(c *cli.Context) error {
 	// Import from Lichess if configured
 	if cfg.Lichess != nil && cfg.Lichess.Username != "" {
 		fmt.Println("\n=== Importing from Lichess ===")
-		count, err := lichess.ImportFromConfig(c.Context, cfg, database, verbose)
+		count, err := lichess.ImportFromConfig(c.Context, cfg, database, logger, verbose)
 		if err != nil {
 			fmt.Printf("Error importing from Lichess: %v\n", err)
 			hasErrors = true
@@ -88,4 +99,20 @@ func ImportCommand(c *cli.Context) error {
 	}
 
 	return nil
+}
+
+// createLogger creates a logger with the specified log level
+func createLogger(logLevelStr string) *slog.Logger {
+	var level logging.Level
+	switch logLevelStr {
+	case "debug":
+		level = logging.LevelDebug
+	case "warn":
+		level = logging.LevelWarn
+	case "error":
+		level = logging.LevelError
+	default:
+		level = logging.LevelInfo
+	}
+	return logging.NewWithLevel(level)
 }

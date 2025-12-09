@@ -3,6 +3,7 @@ package chesscom
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,8 +51,14 @@ func ListArchives(c *cli.Context) error {
 
 // downloadAndImportMonthlyGames downloads and optionally imports games for a specific month
 // If externalDB is provided, it will be used instead of opening a new connection
-func downloadAndImportMonthlyGames(ctx context.Context, username string, year, month int, format, output, dbPath string, importDB, verbose bool, externalDB *db.DB) (int, error) {
-	client := NewClient()
+// If logger is provided, it will be used for logging
+func downloadAndImportMonthlyGames(ctx context.Context, username string, year, month int, format, output, dbPath string, importDB, verbose bool, externalDB *db.DB, logger *slog.Logger) (int, error) {
+	var client *Client
+	if logger != nil {
+		client = NewClientWithLogger(logger)
+	} else {
+		client = NewClient()
+	}
 	fmt.Printf("Fetching games for %s (%d/%02d)...\n", username, year, month)
 
 	// Get the PGN data
@@ -226,6 +233,7 @@ func DownloadGames(c *cli.Context) error {
 				importDB,
 				verbose,
 				database, // Pass the database connection
+				nil,      // No logger available in this context
 			)
 			
 			if err != nil {
@@ -271,6 +279,7 @@ func DownloadGames(c *cli.Context) error {
 			importDB,
 			verbose,
 			nil, // No external DB for single-month case
+			nil, // No logger available in this context
 		)
 		
 		if err != nil {
@@ -394,13 +403,13 @@ func ConvertToDatabase(ctx context.Context, username string, year, month int) (*
 
 // ImportFromConfig imports games using configuration settings
 // If lastImport is non-zero, only games from months since that time are imported
-func ImportFromConfig(ctx context.Context, cfg *config.Config, database *db.DB, verbose bool) (int, error) {
+func ImportFromConfig(ctx context.Context, cfg *config.Config, database *db.DB, logger *slog.Logger, verbose bool) (int, error) {
 	if cfg.ChessCom == nil || cfg.ChessCom.Username == "" {
 		return 0, fmt.Errorf("no Chess.com user configured")
 	}
 
 	username := cfg.ChessCom.Username
-	client := NewClient()
+	client := NewClientWithLogger(logger)
 
 	// Fetch all available archives
 	fmt.Printf("Fetching available archives for %s on Chess.com...\n", username)
@@ -462,6 +471,7 @@ func ImportFromConfig(ctx context.Context, cfg *config.Config, database *db.DB, 
 			true,
 			verbose,
 			database,
+			logger,
 		)
 
 		if err != nil {

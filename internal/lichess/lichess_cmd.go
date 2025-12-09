@@ -3,6 +3,7 @@ package lichess
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -237,13 +238,13 @@ func parseTimeString(timeStr string) (time.Time, error) {
 
 // ImportFromConfig imports games using configuration settings
 // If lastImport is non-zero, only games since that time are imported
-func ImportFromConfig(ctx context.Context, cfg *config.Config, database *db.DB, verbose bool) (int, error) {
+func ImportFromConfig(ctx context.Context, cfg *config.Config, database *db.DB, logger *slog.Logger, verbose bool) (int, error) {
 	if cfg.Lichess == nil || cfg.Lichess.Username == "" {
 		return 0, fmt.Errorf("no Lichess user configured")
 	}
 
 	username := cfg.Lichess.Username
-	client := NewClient()
+	client := NewClientWithLogger(logger)
 
 	// Set API token if available
 	if cfg.Lichess.APIToken != "" {

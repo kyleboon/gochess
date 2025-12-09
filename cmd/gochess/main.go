@@ -28,6 +28,14 @@ func main() {
 	app := &cli.App{
 		Name:  "gochess",
 		Usage: "Chess utilities and analysis tools",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "log-level",
+				Aliases: []string{"l"},
+				Usage:   "Set log level (debug, info, warn, error)",
+				Value:   defaultLogLevel,
+			},
+		},
 		Commands: []*cli.Command{
 			{
 				Name:  "import",

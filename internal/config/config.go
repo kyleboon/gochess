@@ -12,6 +12,7 @@ import (
 // Config represents the gochess configuration
 type Config struct {
 	DatabasePath string                   `yaml:"database_path"`
+	LogLevel     string                   `yaml:"log_level,omitempty"`
 	ChessCom     *ChessComConfig          `yaml:"chesscom,omitempty"`
 	Lichess      *LichessConfig           `yaml:"lichess,omitempty"`
 	LastImport   map[string]time.Time     `yaml:"last_import,omitempty"`
@@ -144,4 +145,12 @@ func (c *Config) SetLastImport(platform, username string, t time.Time) {
 func (c *Config) HasAnySource() bool {
 	return (c.ChessCom != nil && c.ChessCom.Username != "") ||
 		(c.Lichess != nil && c.Lichess.Username != "")
+}
+
+// GetLogLevel returns the configured log level, defaulting to "info" if not set
+func (c *Config) GetLogLevel() string {
+	if c.LogLevel == "" {
+		return "info"
+	}
+	return c.LogLevel
 }
