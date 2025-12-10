@@ -247,8 +247,8 @@ func checkDuplicateGame(tx *sql.Tx, gameHash string) (bool, error) {
 	return false, err
 }
 
-// insertGameRecord inserts a game and its tags into the database
-func insertGameRecord(ctx context.Context, tx *sql.Tx, stmtGame, stmtTag *sql.Stmt, game *pgn.Game, gameText, gameHash string) error {
+// insertGameRecord inserts a game and its tags into the database and returns the game ID
+func insertGameRecord(ctx context.Context, tx *sql.Tx, stmtGame, stmtTag *sql.Stmt, game *pgn.Game, gameText, gameHash string) (int64, error) {
 	// Parse ELO ratings
 	whiteElo, _ := strconv.Atoi(game.Tags["WhiteElo"])
 	blackElo, _ := strconv.Atoi(game.Tags["BlackElo"])
@@ -261,21 +261,32 @@ func insertGameRecord(ctx context.Context, tx *sql.Tx, stmtGame, stmtTag *sql.St
 		gameText, gameHash,
 	)
 	if err != nil {
-		return fmt.Errorf("error inserting game: %w", err)
+		return 0, fmt.Errorf("error inserting game: %w", err)
 	}
 
 	gameID, err := res.LastInsertId()
 	if err != nil {
-		return fmt.Errorf("error getting last insert ID: %w", err)
+		return 0, fmt.Errorf("error getting last insert ID: %w", err)
 	}
 
 	// Insert tags
 	for name, value := range game.Tags {
 		if _, err := stmtTag.Exec(gameID, name, value); err != nil {
-			return fmt.Errorf("error inserting tag %s: %w", name, err)
+			return 0, fmt.Errorf("error inserting tag %s: %w", name, err)
 		}
 	}
 
+	return gameID, nil
+}
+
+// insertPositions inserts all positions for a game into the database
+func insertPositions(ctx context.Context, tx *sql.Tx, stmtPosition *sql.Stmt, gameID int64, positions []Position) error {
+	for _, pos := range positions {
+		_, err := stmtPosition.Exec(gameID, pos.MoveNumber, pos.FEN, pos.NextMove, nil)
+		if err != nil {
+			return fmt.Errorf("error inserting position at move %d: %w", pos.MoveNumber, err)
+		}
+	}
 	return nil
 }
 
@@ -349,6 +360,17 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 	}
 	defer stmtTag.Close()
 
+	stmtPosition, err := tx.PrepareContext(ctx, `
+		INSERT INTO positions (game_id, move_number, fen, next_move, evaluation)
+		VALUES (?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		tx.Rollback()
+		allErrors = append(allErrors, &PGNImportError{OriginalError: fmt.Errorf("failed to prepare position statement: %w", err), PGNText: ""})
+		return 0, allErrors
+	}
+	defer stmtPosition.Close()
+
 	// Count of successfully imported games
 	importedCount := 0
 
@@ -391,10 +413,30 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 		}
 
 		// Insert game and tags
-		if err := insertGameRecord(ctx, tx, stmtGame, stmtTag, game, currentGameText, gameHash); err != nil {
+		gameID, err := insertGameRecord(ctx, tx, stmtGame, stmtTag, game, currentGameText, gameHash)
+		if err != nil {
 			dbErr := fmt.Errorf("game %d (event: %s): %w", i+1, game.Tags["Event"], err)
 			allErrors = append(allErrors, &PGNImportError{OriginalError: dbErr, PGNText: currentGameText})
 			continue
+		}
+
+		// Parse moves and extract positions
+		if err := pgnDB.ParseMoves(game); err != nil {
+			db.logger.Warn("failed to parse moves for game, skipping position storage",
+				"game_id", gameID, "event", game.Tags["Event"], "error", err)
+			// Don't fail the import if move parsing fails, just skip position storage
+		} else {
+			// Extract and insert positions
+			positions := ExtractPositions(game)
+			if len(positions) > 0 {
+				if err := insertPositions(ctx, tx, stmtPosition, gameID, positions); err != nil {
+					db.logger.Warn("failed to insert positions for game",
+						"game_id", gameID, "event", game.Tags["Event"], "error", err)
+					// Don't fail the import if position storage fails
+				} else {
+					db.logger.Debug("positions inserted", "game_id", gameID, "count", len(positions))
+				}
+			}
 		}
 
 		importedCount++

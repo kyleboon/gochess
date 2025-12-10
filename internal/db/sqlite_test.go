@@ -426,7 +426,7 @@ func TestInsertGameRecord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := insertGameRecord(ctx, tx, stmtGame, stmtTag, tt.game, tt.gameText, tt.gameHash)
+			gameID, err := insertGameRecord(ctx, tx, stmtGame, stmtTag, tt.game, tt.gameText, tt.gameHash)
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("insertGameRecord() expected error but got nil")
@@ -435,6 +435,10 @@ func TestInsertGameRecord(t *testing.T) {
 				if err != nil {
 					t.Errorf("insertGameRecord() unexpected error = %v", err)
 				} else {
+					// Verify the game was inserted and we got a valid ID
+					if gameID <= 0 {
+						t.Errorf("insertGameRecord() returned invalid game ID: %d", gameID)
+					}
 					// Verify the game was inserted
 					var count int
 					err = tx.QueryRow("SELECT COUNT(*) FROM games WHERE game_hash = ?", tt.gameHash).Scan(&count)

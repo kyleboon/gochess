@@ -81,4 +81,51 @@ Implement position-based search functionality to enable:
 
 ---
 
+## Session 3: Position Storage During Import
+
+### Task: Extend ImportPGN to parse moves and store positions
+
+**Started:** 2025-12-09
+
+**Status:** ✅ Completed
+
+**Changes:**
+- [x] Modified insertGameRecord() to return game ID
+- [x] Created insertPositions() helper function
+- [x] Added prepared statement for position inserts
+- [x] Integrated position extraction and storage into ImportPGN workflow
+- [x] Updated existing tests to handle new function signature
+- [x] Created comprehensive tests for position storage
+
+**Notes:**
+- Position storage happens after game insertion in same transaction
+- Uses ParseMoves() to parse game tree before extracting positions
+- Gracefully handles move parsing failures (logs warning, continues import)
+- Gracefully handles position storage failures (logs warning, continues import)
+- All position inserts use prepared statement for performance
+- Foreign key CASCADE DELETE ensures positions are deleted with games
+
+**Implementation Details:**
+- Parse moves for each game using pgnDB.ParseMoves()
+- Extract positions using ExtractPositions()
+- Batch insert using prepared statement within transaction
+- Log position count for debugging
+
+**Files Modified:**
+- `internal/db/sqlite.go`: Updated insertGameRecord signature, added insertPositions, integrated into ImportPGN
+- `internal/db/sqlite_test.go`: Updated tests for new insertGameRecord signature
+
+**Files Created:**
+- `internal/db/import_positions_test.go`: Integration tests for position storage
+
+**Test Results:**
+- All existing tests pass
+- New tests verify positions are stored correctly
+- Tests verify multiple games store correct position counts
+- Tests verify duplicate games don't duplicate positions
+
+**Commit:** Ready to commit
+
+---
+
 *Last Updated: 2025-12-09*
