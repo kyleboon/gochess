@@ -147,10 +147,10 @@ func (c *Config) HasAnySource() bool {
 		(c.Lichess != nil && c.Lichess.Username != "")
 }
 
-// GetLogLevel returns the configured log level, defaulting to "info" if not set
+// GetLogLevel returns the configured log level, defaulting to "error" if not set
 func (c *Config) GetLogLevel() string {
 	if c.LogLevel == "" {
-		return "info"
+		return "error"
 	}
 	return c.LogLevel
 }

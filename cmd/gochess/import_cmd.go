@@ -25,9 +25,10 @@ func ImportCommand(c *cli.Context) error {
 	}
 
 	// Determine log level: CLI flag takes precedence over config file
-	logLevel := c.String("log-level")
-	if logLevel == "" {
-		logLevel = cfg.GetLogLevel()
+	// If the flag was set explicitly, use it; otherwise use config
+	logLevel := cfg.GetLogLevel()
+	if c.IsSet("log-level") {
+		logLevel = c.String("log-level")
 	}
 
 	// Create logger with the determined log level

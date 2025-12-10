@@ -120,6 +120,7 @@ func ShowCommand(c *cli.Context) error {
 	fmt.Println("=== GoChess Configuration ===")
 	fmt.Printf("Config file: %s\n", configPath)
 	fmt.Printf("Database: %s\n", cfg.DatabasePath)
+	fmt.Printf("Log Level: %s\n", cfg.GetLogLevel())
 
 	if cfg.ChessCom != nil && cfg.ChessCom.Username != "" {
 		fmt.Println("\nChess.com:")
