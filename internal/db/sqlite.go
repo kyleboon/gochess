@@ -115,14 +115,32 @@ func (db *DB) createTables() error {
 		return fmt.Errorf("failed to create tags table: %w", err)
 	}
 
+	// Create positions table for position-based search
+	_, err = db.conn.Exec(`
+		CREATE TABLE IF NOT EXISTS positions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			game_id INTEGER NOT NULL,
+			move_number INTEGER NOT NULL,
+			fen TEXT NOT NULL,
+			next_move TEXT,
+			evaluation REAL,
+			FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create positions table: %w", err)
+	}
+
 	// Create index on common search fields
 	_, err = db.conn.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_games_players ON games(white, black);
 		CREATE INDEX IF NOT EXISTS idx_games_date ON games(date);
 		CREATE INDEX IF NOT EXISTS idx_tags ON tags(tag_name, tag_value);
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_game_hash ON games(game_hash);
+		CREATE INDEX IF NOT EXISTS idx_positions_fen ON positions(fen);
+		CREATE INDEX IF NOT EXISTS idx_positions_game_id ON positions(game_id);
 	`)
-	
+
 	return err
 }
 
@@ -547,11 +565,17 @@ func (db *DB) ClearGames(ctx context.Context) error {
 		}
 	}()
 
-	// Delete all tags first (due to foreign key constraints)
+	// Delete all child tables first (due to foreign key constraints)
 	_, err = tx.Exec("DELETE FROM tags")
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete tags: %w", err)
+	}
+
+	_, err = tx.Exec("DELETE FROM positions")
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete positions: %w", err)
 	}
 
 	// Delete all games
@@ -562,7 +586,7 @@ func (db *DB) ClearGames(ctx context.Context) error {
 	}
 
 	// Reset the auto-increment counters
-	_, err = tx.Exec("DELETE FROM sqlite_sequence WHERE name='games' OR name='tags'")
+	_, err = tx.Exec("DELETE FROM sqlite_sequence WHERE name='games' OR name='tags' OR name='positions'")
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to reset sequence: %w", err)
