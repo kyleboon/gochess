@@ -128,4 +128,62 @@ Implement position-based search functionality to enable:
 
 ---
 
+## Session 4: Position Statistics
+
+### Task: Add position statistics to stats command
+
+**Started:** 2025-12-09
+
+**Status:** ✅ Completed
+
+**Changes:**
+- [x] Created GetPositionStats() database method
+- [x] Added PositionFrequency struct to represent position counts
+- [x] Integrated position stats into stats command output
+- [x] Created comprehensive tests for position statistics
+
+**Notes:**
+- GetPositionStats() returns unique position count and top 10 most common positions
+- Queries use GROUP BY with COUNT to aggregate position frequencies
+- Results sorted by frequency (descending) with LIMIT 10
+- Stats displayed only in table format (not CSV)
+- Gracefully handles empty database (shows 0 unique positions)
+
+**Implementation Details:**
+- Two SQL queries: one for unique count, one for top positions
+- Top positions query uses GROUP BY fen ORDER BY count DESC
+- FEN strings truncated to 60 chars for display
+- Position stats appear after player stats in table format
+
+**Files Modified:**
+- `internal/db/sqlite.go`: Added GetPositionStats() method and PositionFrequency struct
+- `cmd/gochess/main.go`: Added position stats display to statsCommand
+
+**Files Created:**
+- `internal/db/position_stats_test.go`: Comprehensive tests for position statistics
+
+**Test Results:**
+- All existing tests pass
+- New tests verify correct counting and sorting
+- Tests verify starting position is most common
+- Tests verify top 10 limit is respected
+- Tests verify graceful handling of empty database
+
+**Example Output:**
+```
+Position Statistics:
+  Unique positions: 1234
+
+  Top 10 Most Common Positions:
+  COUNT  FEN
+  ----------------------------------------------------------------------
+  150    rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+  75     rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2
+  ...
+```
+
+**Commit:** Ready to commit
+
+---
+
 *Last Updated: 2025-12-09*

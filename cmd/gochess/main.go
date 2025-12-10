@@ -635,6 +635,32 @@ func statsCommand(c *cli.Context) error {
 		}
 	}
 
+	// Get and display position statistics (only in table format)
+	if format == "table" {
+		uniqueCount, topPositions, err := database.GetPositionStats(c.Context)
+		if err != nil {
+			fmt.Printf("\nWarning: Failed to get position statistics: %v\n", err)
+		} else if uniqueCount > 0 {
+			fmt.Printf("\nPosition Statistics:\n")
+			fmt.Printf("  Unique positions: %d\n", uniqueCount)
+
+			if len(topPositions) > 0 {
+				fmt.Printf("\n  Top 10 Most Common Positions:\n")
+				fmt.Printf("  %-6s %s\n", "COUNT", "FEN")
+				fmt.Println("  " + repeatString("-", 70))
+
+				for _, pos := range topPositions {
+					// Truncate very long FEN strings for display
+					fen := pos.FEN
+					if len(fen) > 60 {
+						fen = fen[:57] + "..."
+					}
+					fmt.Printf("  %-6d %s\n", pos.Count, fen)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

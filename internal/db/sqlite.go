@@ -794,3 +794,50 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 
 	return results, nil
 }
+
+// PositionFrequency represents a position and how often it occurs
+type PositionFrequency struct {
+	FEN   string // The position in FEN notation
+	Count int    // Number of times this position appears in the database
+}
+
+// GetPositionStats retrieves statistics about positions in the database
+func (db *DB) GetPositionStats(ctx context.Context) (uniqueCount int, topPositions []PositionFrequency, err error) {
+	// Get count of unique positions
+	err = db.conn.QueryRowContext(ctx, "SELECT COUNT(DISTINCT fen) FROM positions").Scan(&uniqueCount)
+	if err != nil {
+		db.logger.Error("failed to get unique position count", "error", err)
+		return 0, nil, fmt.Errorf("failed to get unique position count: %w", err)
+	}
+
+	// Get top 10 most common positions
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT fen, COUNT(*) as frequency
+		FROM positions
+		GROUP BY fen
+		ORDER BY frequency DESC
+		LIMIT 10
+	`)
+	if err != nil {
+		db.logger.Error("failed to query top positions", "error", err)
+		return 0, nil, fmt.Errorf("failed to query top positions: %w", err)
+	}
+	defer rows.Close()
+
+	topPositions = make([]PositionFrequency, 0, 10)
+	for rows.Next() {
+		var pos PositionFrequency
+		if err := rows.Scan(&pos.FEN, &pos.Count); err != nil {
+			return 0, nil, fmt.Errorf("failed to scan position row: %w", err)
+		}
+		topPositions = append(topPositions, pos)
+	}
+
+	if err := rows.Err(); err != nil {
+		db.logger.Error("error iterating position rows", "error", err)
+		return 0, nil, fmt.Errorf("error iterating position rows: %w", err)
+	}
+
+	db.logger.Debug("position stats retrieved", "uniqueCount", uniqueCount, "topPositionsCount", len(topPositions))
+	return uniqueCount, topPositions, nil
+}
