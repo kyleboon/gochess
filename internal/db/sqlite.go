@@ -802,18 +802,20 @@ type PositionFrequency struct {
 }
 
 // GetPositionStats retrieves statistics about positions in the database
+// Only includes positions reached after move 10 (move_number >= 20 half-moves)
 func (db *DB) GetPositionStats(ctx context.Context) (uniqueCount int, topPositions []PositionFrequency, err error) {
-	// Get count of unique positions
-	err = db.conn.QueryRowContext(ctx, "SELECT COUNT(DISTINCT fen) FROM positions").Scan(&uniqueCount)
+	// Get count of unique positions (after move 10)
+	err = db.conn.QueryRowContext(ctx, "SELECT COUNT(DISTINCT fen) FROM positions WHERE move_number >= 20").Scan(&uniqueCount)
 	if err != nil {
 		db.logger.Error("failed to get unique position count", "error", err)
 		return 0, nil, fmt.Errorf("failed to get unique position count: %w", err)
 	}
 
-	// Get top 10 most common positions
+	// Get top 10 most common positions (after move 10)
 	rows, err := db.conn.QueryContext(ctx, `
 		SELECT fen, COUNT(*) as frequency
 		FROM positions
+		WHERE move_number >= 20
 		GROUP BY fen
 		ORDER BY frequency DESC
 		LIMIT 10
