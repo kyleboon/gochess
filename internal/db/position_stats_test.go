@@ -88,6 +88,14 @@ func TestGetPositionStats(t *testing.T) {
 		for _, pos := range topPositions {
 			assert.Greater(t, pos.Count, 0, "All positions should have count > 0")
 			assert.NotEmpty(t, pos.FEN, "All positions should have a FEN string")
+
+			// Verify win statistics add up to 100%
+			totalPct := pos.WhiteWinPct + pos.BlackWinPct + pos.DrawPct
+			assert.InDelta(t, 100.0, totalPct, 0.1, "Win percentages should add up to 100%")
+
+			// Verify counts add up to total
+			totalCount := pos.WhiteWins + pos.BlackWins + pos.Draws
+			assert.Equal(t, pos.Count, totalCount, "Win counts should add up to total count")
 		}
 
 		// Verify counts are in descending order
@@ -155,5 +163,10 @@ func TestGetPositionStats_LargeDataset(t *testing.T) {
 	if len(topPositions) > 0 {
 		assert.Equal(t, 20, topPositions[0].Count,
 			"Most common position after move 10 should appear 20 times (once per game)")
+
+		// All games have the same result (1-0), so white should have 100% win rate
+		assert.Equal(t, 100.0, topPositions[0].WhiteWinPct, "White should win 100% with identical games")
+		assert.Equal(t, 0.0, topPositions[0].BlackWinPct, "Black should win 0% with identical games")
+		assert.Equal(t, 0.0, topPositions[0].DrawPct, "Should be 0% draws with identical games")
 	}
 }

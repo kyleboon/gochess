@@ -797,8 +797,14 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 
 // PositionFrequency represents a position and how often it occurs
 type PositionFrequency struct {
-	FEN   string // The position in FEN notation
-	Count int    // Number of times this position appears in the database
+	FEN            string  // The position in FEN notation
+	Count          int     // Number of times this position appears in the database
+	WhiteWins      int     // Number of games where white won from this position
+	BlackWins      int     // Number of games where black won from this position
+	Draws          int     // Number of games that were drawn from this position
+	WhiteWinPct    float64 // Percentage of games white won (0-100)
+	BlackWinPct    float64 // Percentage of games black won (0-100)
+	DrawPct        float64 // Percentage of games drawn (0-100)
 }
 
 // GetPositionStats retrieves statistics about positions in the database
@@ -811,12 +817,18 @@ func (db *DB) GetPositionStats(ctx context.Context) (uniqueCount int, topPositio
 		return 0, nil, fmt.Errorf("failed to get unique position count: %w", err)
 	}
 
-	// Get top 10 most common positions (after move 10)
+	// Get top 10 most common positions (after move 10) with win statistics
 	rows, err := db.conn.QueryContext(ctx, `
-		SELECT fen, COUNT(*) as frequency
-		FROM positions
-		WHERE move_number >= 20
-		GROUP BY fen
+		SELECT
+			p.fen,
+			COUNT(*) as frequency,
+			SUM(CASE WHEN g.result = '1-0' THEN 1 ELSE 0 END) as white_wins,
+			SUM(CASE WHEN g.result = '0-1' THEN 1 ELSE 0 END) as black_wins,
+			SUM(CASE WHEN g.result = '1/2-1/2' THEN 1 ELSE 0 END) as draws
+		FROM positions p
+		JOIN games g ON p.game_id = g.id
+		WHERE p.move_number >= 20
+		GROUP BY p.fen
 		ORDER BY frequency DESC
 		LIMIT 10
 	`)
@@ -829,9 +841,17 @@ func (db *DB) GetPositionStats(ctx context.Context) (uniqueCount int, topPositio
 	topPositions = make([]PositionFrequency, 0, 10)
 	for rows.Next() {
 		var pos PositionFrequency
-		if err := rows.Scan(&pos.FEN, &pos.Count); err != nil {
+		if err := rows.Scan(&pos.FEN, &pos.Count, &pos.WhiteWins, &pos.BlackWins, &pos.Draws); err != nil {
 			return 0, nil, fmt.Errorf("failed to scan position row: %w", err)
 		}
+
+		// Calculate percentages
+		if pos.Count > 0 {
+			pos.WhiteWinPct = float64(pos.WhiteWins) / float64(pos.Count) * 100
+			pos.BlackWinPct = float64(pos.BlackWins) / float64(pos.Count) * 100
+			pos.DrawPct = float64(pos.Draws) / float64(pos.Count) * 100
+		}
+
 		topPositions = append(topPositions, pos)
 	}
 

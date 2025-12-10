@@ -645,9 +645,9 @@ func statsCommand(c *cli.Context) error {
 			fmt.Printf("  Unique positions: %d\n", uniqueCount)
 
 			if len(topPositions) > 0 {
-				fmt.Printf("\n  Top 10 Most Common Positions:\n")
-				fmt.Printf("  %-6s %s\n", "COUNT", "FEN")
-				fmt.Println("  " + repeatString("-", 70))
+				fmt.Printf("\n  Top 10 Most Common Positions (after move 10):\n")
+				fmt.Printf("  %-6s %-6s %-6s %-6s %s\n", "COUNT", "WHITE%", "BLACK%", "DRAW%", "FEN")
+				fmt.Println("  " + repeatString("-", 100))
 
 				for _, pos := range topPositions {
 					// Truncate very long FEN strings for display
@@ -655,7 +655,8 @@ func statsCommand(c *cli.Context) error {
 					if len(fen) > 60 {
 						fen = fen[:57] + "..."
 					}
-					fmt.Printf("  %-6d %s\n", pos.Count, fen)
+					fmt.Printf("  %-6d %-6.1f %-6.1f %-6.1f %s\n",
+						pos.Count, pos.WhiteWinPct, pos.BlackWinPct, pos.DrawPct, fen)
 				}
 			}
 		}
