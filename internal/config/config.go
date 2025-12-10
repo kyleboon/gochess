@@ -141,6 +141,11 @@ func (c *Config) SetLastImport(platform, username string, t time.Time) {
 	c.LastImport[key] = t
 }
 
+// ClearAllLastImports clears all last import timestamps
+func (c *Config) ClearAllLastImports() {
+	c.LastImport = make(map[string]time.Time)
+}
+
 // HasAnySource returns true if at least one source is configured
 func (c *Config) HasAnySource() bool {
 	return (c.ChessCom != nil && c.ChessCom.Username != "") ||

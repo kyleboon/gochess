@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kyleboon/gochess/internal/config"
 	"github.com/urfave/cli/v2"
 )
 
@@ -378,18 +379,31 @@ func ClearCommand(c *cli.Context) error {
 		return fmt.Errorf("failed to get initial game count: %w", err)
 	}
 
-	if count == 0 {
+	// Clear all games (if any)
+	if count > 0 {
+		fmt.Println("Clearing all games from database...")
+		if err := db.ClearGames(c.Context); err != nil {
+			return fmt.Errorf("failed to clear games: %w", err)
+		}
+		fmt.Printf("Successfully deleted %d games from the database\n", count)
+	} else {
 		fmt.Println("Database is already empty")
-		return nil
 	}
 
-	// Clear all games
-	fmt.Println("Clearing all games from database...")
-	if err := db.ClearGames(c.Context); err != nil {
-		return fmt.Errorf("failed to clear games: %w", err)
+	// Reset last import timestamps in config (regardless of whether there were games)
+	fmt.Println("Resetting last import timestamps...")
+	cfg, err := config.LoadOrDefault()
+	if err != nil {
+		fmt.Printf("Warning: Failed to load config to reset import timestamps: %v\n", err)
+	} else {
+		cfg.ClearAllLastImports()
+		if err := cfg.SaveDefault(); err != nil {
+			fmt.Printf("Warning: Failed to save config after clearing import timestamps: %v\n", err)
+		} else {
+			fmt.Println("Last import timestamps reset successfully")
+		}
 	}
-	
-	fmt.Printf("Successfully deleted %d games from the database\n", count)
+
 	return nil
 }
 
