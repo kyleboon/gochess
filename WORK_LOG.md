@@ -51,4 +51,34 @@ Implement position-based search functionality to enable:
 
 ---
 
+## Session 2: Position Extraction
+
+### Task: Implement FEN generation for each move during game playback
+
+**Started:** 2025-12-09
+
+**Status:** ✅ Completed
+
+**Changes:**
+- [x] Create ExtractPositions() function to walk through PGN game tree
+- [x] Generate FEN for each position in the game
+- [x] Store move number and next move in SAN notation
+- [x] Write comprehensive tests for position extraction
+
+**Notes:**
+- Created `internal/db/positions.go` with ExtractPositions() function
+- Walks through pgn.Game.Root linked list to extract all positions
+- Uses existing Board.Fen() method to generate FEN strings
+- Stores positions with move numbers (ply count) and next move
+- Move format uses UCI notation for now (e.g., "e2e4", "e7e8q")
+- All tests pass (including edge cases like games with no moves)
+
+**Files Created:**
+- `internal/db/positions.go`: Position extraction logic
+- `internal/db/positions_test.go`: Comprehensive tests
+
+**Commit:** Ready to commit
+
+---
+
 *Last Updated: 2025-12-09*
