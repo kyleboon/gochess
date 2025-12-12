@@ -2,6 +2,13 @@
 
 ## ✅ Recently Completed
 
+### Lichess Integration (2024-12-09)
+- [x] Research Lichess API endpoints and authentication
+- [x] Create `internal/lichess` package with client and retry logic
+- [x] Implement `GetPlayerGamesPGN()` with date range filtering
+- [x] Add `gochess lichess download` CLI command with comprehensive options
+- [x] Write comprehensive unit tests with httptest
+
 ### Configuration & Import Simplification (2024-12-09)
 - [x] Create configuration file system (`~/.gochess/config.yaml`)
   - Store usernames, API tokens, database path
@@ -20,22 +27,27 @@
   - Chess.com: Skips months before last import date
   - Updates last import timestamp after successful import
 
+### Position Storage & Statistics (2025-12-09)
+- [x] Add `positions` table to database schema with FEN and move_number
+- [x] Create ExtractPositions() function to generate FEN for each move
+- [x] Extend PGN import to parse moves and store positions automatically
+- [x] Add GetPositionStats() method for position frequency analysis
+- [x] Integrate position statistics into `stats` command output
+- [x] Write comprehensive tests for position extraction and storage
+
 ## 🔥 High Priority - Core Features
 
-### Position-Based Search
-- [ ] Add `positions` table to database schema
-  - Columns: `id`, `game_id`, `move_number`, `fen`, `evaluation`, `next_move`
-  - Index on FEN for fast lookups
-  - Store positions at every move or key positions only?
-- [ ] Extend PGN import to parse moves and generate positions
-  - Walk through game moves and generate FEN for each position
-  - Store positions during import process
+### Position-Based Search (Partially Complete)
+- [x] Add `positions` table to database schema
+- [x] Extend PGN import to parse moves and generate positions
+- [x] Add position frequency statistics to `stats` command
 - [ ] Implement position search command
   - `gochess db search-position --fen "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"`
   - Return all games that reached this position
-- [ ] Add position-specific statistics
-  - Win/loss/draw rates from specific positions
+- [ ] Add position-specific win/loss/draw statistics
   - "After 1.e4 c5 2.Nf3, I win 60%, draw 30%, lose 10%"
+  - Group by FEN and aggregate results
+  - Filter by player (white/black) and result
 
 ### Opening Classification & Search
 - [ ] Research ECO code database/classification system
@@ -54,26 +66,8 @@
   - Most/least successful openings
   - Opening frequency distribution
 
-### Lichess Integration
-- [x] Research Lichess API endpoints
-  - Games export endpoint: `https://lichess.org/api/games/user/{username}`
-  - Uses date range filtering instead of monthly archives
-  - Rate limiting: ~120 requests/minute with API token
-- [x] Create `internal/lichess` package
-  - Mirror structure of `internal/chesscom`
-  - Client with logger and retry logic
-  - Support for downloading game archives
-- [x] Implement Lichess API client
-  - `GetPlayerGamesPGN()` - Download games in PGN format
-  - Supports date range filtering (since/until timestamps)
-  - Handle authentication (API token support for private games)
-  - Implement rate limiting/retry (429 detection like Chess.com)
-- [x] Add Lichess CLI commands
-  - `gochess lichess download --username <user>` with date range and filter options
-  - Supports `--since`, `--until`, `--max`, `--vs`, `--rated`, `--perf-type`, `--color`
-  - Supports `--import-db` for direct database import
-  - Supports `--api-token` for authenticated requests
-- [ ] Add Lichess support to TUI (optional)
+### Lichess TUI Integration (Optional)
+- [ ] Add Lichess support to TUI
   - Similar to Chess.com browser
   - Switch between Chess.com/Lichess sources
 
@@ -143,6 +137,11 @@
 - [ ] Improve Chess.com/Lichess browser UX
   - Better loading states
   - Progress indicators for bulk downloads
+
+### Configuration Enhancements
+- [ ] Add automatic scheduled imports (cron-like feature)
+- [ ] Add import hooks for notifications
+- [ ] Add config file validation and migration support
 
 ### Performance Optimizations
 - [ ] Add database indexes for common queries

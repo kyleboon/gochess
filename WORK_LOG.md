@@ -1,189 +1,148 @@
 # GoChess Work Log
 
-## Position Search Implementation - 2025-12-09
-
-### Session Goals
-Implement position-based search functionality to enable:
-- Storing FEN positions for each move in every game
-- Searching for games that reach specific positions
-- Statistics on win/loss/draw rates from positions
-
-### Implementation Plan
-1. Database schema design and migration for `positions` table
-2. FEN generation for each move during game playback
-3. Extend ImportPGN to parse moves and store positions
-4. Create SearchPositions database method
-5. Add position search CLI command
-6. Implement position statistics aggregation
-7. Write comprehensive tests
+This file tracks major development sessions and their outcomes. For detailed tasks and future work, see [TODO.md](TODO.md).
 
 ---
 
-## Session 1: Database Schema & Migration
+## 2025-12-09: Position Storage & Statistics
 
-### Task: Design and implement positions table schema
+**Goal:** Enable position-based analysis by storing FEN positions for every move in imported games.
 
-**Started:** 2025-12-09
-
-**Status:** ✅ Completed
-
-**Changes:**
-- [x] Add `positions` table schema to createTables()
-- [x] Add indexes for FEN and game_id lookups
-- [x] Test migration on new database
-- [x] Update ClearGames() to handle positions table
-
-**Notes:**
-- Schema design:
-  - `id`: Primary key
-  - `game_id`: Foreign key to games table with CASCADE DELETE
-  - `move_number`: Half-move (ply) number
-  - `fen`: Position in FEN notation
-  - `next_move`: Move played from this position (SAN notation)
-  - `evaluation`: Nullable for future engine integration
-- Indexes on `fen` and `game_id` for performance
-- All existing database tests pass
-
-**Files Modified:**
-- `internal/db/sqlite.go`: Added positions table creation and indexes
-
-**Commit:** Ready to commit
-
----
-
-## Session 2: Position Extraction
-
-### Task: Implement FEN generation for each move during game playback
-
-**Started:** 2025-12-09
-
-**Status:** ✅ Completed
-
-**Changes:**
-- [x] Create ExtractPositions() function to walk through PGN game tree
-- [x] Generate FEN for each position in the game
-- [x] Store move number and next move in SAN notation
-- [x] Write comprehensive tests for position extraction
-
-**Notes:**
-- Created `internal/db/positions.go` with ExtractPositions() function
-- Walks through pgn.Game.Root linked list to extract all positions
-- Uses existing Board.Fen() method to generate FEN strings
-- Stores positions with move numbers (ply count) and next move
-- Move format uses UCI notation for now (e.g., "e2e4", "e7e8q")
-- All tests pass (including edge cases like games with no moves)
+**What Was Built:**
+- Database schema with `positions` table (FEN, move_number, next_move, evaluation)
+- `ExtractPositions()` function to walk game tree and generate FEN strings
+- Automatic position storage during PGN import
+- `GetPositionStats()` method for position frequency analysis
+- Position statistics integrated into `gochess stats` command
 
 **Files Created:**
-- `internal/db/positions.go`: Position extraction logic
-- `internal/db/positions_test.go`: Comprehensive tests
+- `internal/db/positions.go` - Position extraction logic
+- `internal/db/positions_test.go` - Position extraction tests
+- `internal/db/import_positions_test.go` - Integration tests
+- `internal/db/position_stats_test.go` - Statistics tests
 
-**Commit:** Ready to commit
+**Files Modified:**
+- `internal/db/sqlite.go` - Added positions table, storage, and stats methods
+- `cmd/gochess/main.go` - Added position stats to output
+
+**Key Decisions:**
+- Store positions for ALL moves (not just key positions) for complete analysis
+- Use FEN as primary lookup key with index for performance
+- Gracefully handle move parsing failures (log warning, continue import)
+- Position storage happens in same transaction as game insert
+
+**Test Coverage:**
+- Position extraction for various game types
+- Position storage during import
+- Position frequency statistics
+- Edge cases (empty games, duplicate games)
+
+**What's Next:**
+- Implement position search command (`gochess db search-position`)
+- Add win/loss/draw statistics per position
+- See [TODO.md](TODO.md) for complete roadmap
 
 ---
 
-## Session 3: Position Storage During Import
+## 2024-12-09: Configuration & Import Simplification
 
-### Task: Extend ImportPGN to parse moves and store positions
+**Goal:** Make importing games trivial with a configuration system and unified import command.
 
-**Started:** 2025-12-09
-
-**Status:** ✅ Completed
-
-**Changes:**
-- [x] Modified insertGameRecord() to return game ID
-- [x] Created insertPositions() helper function
-- [x] Added prepared statement for position inserts
-- [x] Integrated position extraction and storage into ImportPGN workflow
-- [x] Updated existing tests to handle new function signature
-- [x] Created comprehensive tests for position storage
-
-**Notes:**
-- Position storage happens after game insertion in same transaction
-- Uses ParseMoves() to parse game tree before extracting positions
-- Gracefully handles move parsing failures (logs warning, continues import)
-- Gracefully handles position storage failures (logs warning, continues import)
-- All position inserts use prepared statement for performance
-- Foreign key CASCADE DELETE ensures positions are deleted with games
-
-**Implementation Details:**
-- Parse moves for each game using pgnDB.ParseMoves()
-- Extract positions using ExtractPositions()
-- Batch insert using prepared statement within transaction
-- Log position count for debugging
-
-**Files Modified:**
-- `internal/db/sqlite.go`: Updated insertGameRecord signature, added insertPositions, integrated into ImportPGN
-- `internal/db/sqlite_test.go`: Updated tests for new insertGameRecord signature
+**What Was Built:**
+- Configuration system (`~/.gochess/config.yaml`)
+  - Stores usernames, API tokens, database path
+  - Tracks last import timestamp per platform/user
+- Unified `gochess import` command
+  - Imports from all configured sources automatically
+  - Incremental by default (only new games since last import)
+  - `--full` flag for complete re-import
+- `gochess config` command suite
+  - `config init` - Interactive setup wizard
+  - `config show` - Display current configuration
+  - `config add-user` / `config remove-user` - Manage tracked users
+- Smart import functions for both Chess.com and Lichess
+  - Lichess: Uses `since` parameter for date filtering
+  - Chess.com: Skips months before last import date
 
 **Files Created:**
-- `internal/db/import_positions_test.go`: Integration tests for position storage
-
-**Test Results:**
-- All existing tests pass
-- New tests verify positions are stored correctly
-- Tests verify multiple games store correct position counts
-- Tests verify duplicate games don't duplicate positions
-
-**Commit:** Ready to commit
-
----
-
-## Session 4: Position Statistics
-
-### Task: Add position statistics to stats command
-
-**Started:** 2025-12-09
-
-**Status:** ✅ Completed
-
-**Changes:**
-- [x] Created GetPositionStats() database method
-- [x] Added PositionFrequency struct to represent position counts
-- [x] Integrated position stats into stats command output
-- [x] Created comprehensive tests for position statistics
-
-**Notes:**
-- GetPositionStats() returns unique position count and top 10 most common positions
-- Queries use GROUP BY with COUNT to aggregate position frequencies
-- Results sorted by frequency (descending) with LIMIT 10
-- Stats displayed only in table format (not CSV)
-- Gracefully handles empty database (shows 0 unique positions)
-
-**Implementation Details:**
-- Two SQL queries: one for unique count, one for top positions
-- Top positions query uses GROUP BY fen ORDER BY count DESC
-- FEN strings truncated to 60 chars for display
-- Position stats appear after player stats in table format
+- `internal/config/config.go` - Configuration structures and I/O
+- `internal/config/config_test.go` - Test coverage
+- `internal/config/commands.go` - CLI command implementations
+- `cmd/gochess/import_cmd.go` - Unified import command
 
 **Files Modified:**
-- `internal/db/sqlite.go`: Added GetPositionStats() method and PositionFrequency struct
-- `cmd/gochess/main.go`: Added position stats display to statsCommand
+- `cmd/gochess/main.go` - Added config and import commands
+- `internal/lichess/lichess_cmd.go` - Added `ImportFromConfig()`
+- `internal/chesscom/chesscom_cmd.go` - Added `ImportFromConfig()`
 
-**Files Created:**
-- `internal/db/position_stats_test.go`: Comprehensive tests for position statistics
+**User Impact:**
+```bash
+# Before: Complex workflow with many flags
+gochess chesscom download --username player --year 2024 --month 12 --import-db --database ~/.gochess/games.db
+gochess lichess download --username player --since 2024-12-01 --import-db --database ~/.gochess/games.db --api-token <token>
 
-**Test Results:**
-- All existing tests pass
-- New tests verify correct counting and sorting
-- Tests verify starting position is most common
-- Tests verify top 10 limit is respected
-- Tests verify graceful handling of empty database
-
-**Example Output:**
-```
-Position Statistics:
-  Unique positions: 1234
-
-  Top 10 Most Common Positions:
-  COUNT  FEN
-  ----------------------------------------------------------------------
-  150    rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-  75     rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2
-  ...
+# After: Simple one-time setup + single command
+gochess config init
+gochess import
 ```
 
-**Commit:** Ready to commit
+**What's Next:**
+- Automatic scheduled imports (cron-like)
+- Import hooks for notifications
+- Config validation and migration
 
 ---
 
-*Last Updated: 2025-12-09*
+## 2024-12-09: Lichess Integration
+
+**Goal:** Add Lichess API support to complement existing Chess.com integration.
+
+**What Was Built:**
+- `internal/lichess` package mirroring Chess.com client structure
+- HTTP client with exponential backoff retry logic
+- `GetPlayerGamesPGN()` method with comprehensive filtering
+  - Date range filtering (`since`, `until`)
+  - Game type filtering (`rated`, `perf-type`, `color`, `vs`)
+  - API token support for private games
+- `gochess lichess download` CLI command with all filter options
+- Complete test coverage with `httptest`
+
+**Files Created:**
+- `internal/lichess/models.go` - GamesParams and configuration
+- `internal/lichess/client.go` - HTTP client with retry logic
+- `internal/lichess/client_test.go` - Comprehensive tests
+- `internal/lichess/lichess_cmd.go` - CLI command
+
+**Files Modified:**
+- `cmd/gochess/main.go` - Added lichess command group
+
+**Key Differences: Chess.com vs Lichess:**
+- Archive Structure: Monthly archives vs date range filtering
+- Response Format: JSON with games array vs ndjson (streaming PGN)
+- Rate Limiting: Serial requests safe vs ~120 req/min with token
+- Authentication: Public only vs optional token for private games
+
+**Test Coverage:**
+- HTTP retry logic with 429 responses
+- Context cancellation
+- Query parameter building
+- Date range filtering
+- API token authentication
+
+**What's Next:**
+- Optional TUI integration for Lichess browser
+
+---
+
+## Archive: Earlier Sessions
+
+For historical context on earlier development work, see git history. Major milestones:
+- Chess.com API integration
+- PGN parser and database
+- Move generation and validation
+- Terminal UI (TUI) with Bubble Tea
+- SQLite database with duplicate detection
+
+---
+
+*Last Updated: 2025-12-12*

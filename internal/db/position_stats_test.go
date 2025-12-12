@@ -75,15 +75,15 @@ func TestGetPositionStats(t *testing.T) {
 		uniqueCount, topPositions, err := db.GetPositionStats(ctx)
 		require.NoError(t, err)
 
-		// Should have many unique positions (only counting positions after move 10)
+		// Should have many unique positions (counting all positions)
 		assert.Greater(t, uniqueCount, 0, "Should have at least some unique positions")
 
 		// Should have top positions
 		assert.NotEmpty(t, topPositions, "Should have some top positions")
 		assert.LessOrEqual(t, len(topPositions), 10, "Should return at most 10 top positions")
 
-		// Since we only count positions after move 10, and the games diverge before that,
-		// we won't necessarily have positions appearing in multiple games
+		// The top positions list is filtered to after move 10
+		// Since the games diverge before that, we won't necessarily have positions appearing in multiple games
 		// Just verify that we have valid position data
 		for _, pos := range topPositions {
 			assert.Greater(t, pos.Count, 0, "All positions should have count > 0")
@@ -152,17 +152,17 @@ func TestGetPositionStats_LargeDataset(t *testing.T) {
 	uniqueCount, topPositions, err := db.GetPositionStats(ctx)
 	require.NoError(t, err)
 
-	// With 20 identical games, we should have only a few unique positions (after move 10)
-	assert.LessOrEqual(t, uniqueCount, 10, "Should have few unique positions with identical games")
+	// With 20 identical games (11 full moves = 22 half-moves), we should have 22 unique positions total
+	assert.Equal(t, 22, uniqueCount, "Should have 22 unique positions with 20 identical 11-move games")
 
 	// Should still limit to 10 results
 	assert.LessOrEqual(t, len(topPositions), 10, "Should return at most 10 top positions")
 
-	// The most common position (after move 10) should appear 20 times
-	// Note: we only count positions after move 10 (20 half-moves)
+	// The top positions list is filtered to after move 10 (20 half-moves)
+	// The most common position should appear 20 times
 	if len(topPositions) > 0 {
 		assert.Equal(t, 20, topPositions[0].Count,
-			"Most common position after move 10 should appear 20 times (once per game)")
+			"Most common position (after move 10) should appear 20 times (once per game)")
 
 		// All games have the same result (1-0), so white should have 100% win rate
 		assert.Equal(t, 100.0, topPositions[0].WhiteWinPct, "White should win 100% with identical games")

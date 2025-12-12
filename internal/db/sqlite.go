@@ -644,16 +644,66 @@ func (db *DB) ClearGames(ctx context.Context) error {
 
 // PlayerStats represents statistics for a player
 type PlayerStats struct {
-	Name       string  // Player's name
-	Games      int     // Total games played
-	Wins       int     // Total wins
-	Losses     int     // Total losses
-	Draws      int     // Total draws
-	WinRate    float64 // Win rate as a percentage
-	WhiteGames int     // Games played as white
-	BlackGames int     // Games played as black
-	WhiteWins  int     // Wins as white
-	BlackWins  int     // Wins as black
+	Name          string  // Player's name
+	Games         int     // Total games played
+	Wins          int     // Total wins
+	Losses        int     // Total losses
+	Draws         int     // Total draws
+	WinRate       float64 // Win rate as a percentage
+	WhiteGames    int     // Games played as white
+	BlackGames    int     // Games played as black
+	WhiteWins     int     // Wins as white
+	BlackWins     int     // Wins as black
+	WhiteLosses   int     // Losses as white
+	BlackLosses   int     // Losses as black
+	WhiteDraws    int     // Draws as white
+	BlackDraws    int     // Draws as black
+	WhiteWinRate  float64 // Win rate as white (0-100)
+	BlackWinRate  float64 // Win rate as black (0-100)
+	BulletGames   int     // Games in bullet time control
+	BlitzGames    int     // Games in blitz time control
+	RapidGames    int     // Games in rapid time control
+	ClassicalGames int    // Games in classical/daily time control
+}
+
+// categorizeTimeControl categorizes a time control string into bullet/blitz/rapid/classical
+func categorizeTimeControl(tc string) string {
+	if tc == "" {
+		return "unknown"
+	}
+
+	// Parse time control formats like "180+0", "600+5", "1/86400", etc.
+	// For Chess.com/Lichess, typical formats are:
+	// - Bullet: < 3 minutes (180 seconds)
+	// - Blitz: 3-10 minutes (180-600 seconds)
+	// - Rapid: 10-60 minutes (600-3600 seconds)
+	// - Classical: > 60 minutes or daily/correspondence
+
+	// Handle daily/correspondence formats (like "1/86400")
+	if strings.Contains(tc, "/") {
+		return "classical"
+	}
+
+	// Parse base time in seconds
+	parts := strings.Split(tc, "+")
+	if len(parts) == 0 {
+		return "unknown"
+	}
+
+	baseTime, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return "unknown"
+	}
+
+	// Categorize based on base time
+	if baseTime < 180 {
+		return "bullet"
+	} else if baseTime < 600 {
+		return "blitz"
+	} else if baseTime < 3600 {
+		return "rapid"
+	}
+	return "classical"
 }
 
 // GetPlayerStats retrieves statistics for all players in the database
@@ -671,7 +721,7 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 	if len(players) == 0 {
 		// Query all games
 		query = `
-			SELECT white, black, result
+			SELECT white, black, result, time_control
 			FROM games
 			WHERE white != '' AND black != ''
 		`
@@ -685,7 +735,7 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 		}
 		playerList := strings.Join(placeholders, ",")
 		query = fmt.Sprintf(`
-			SELECT white, black, result
+			SELECT white, black, result, time_control
 			FROM games
 			WHERE (white IN (%s) OR black IN (%s))
 			AND white != '' AND black != ''
@@ -712,8 +762,15 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 	// Process each game
 	for rows.Next() {
 		var white, black, result string
-		if err := rows.Scan(&white, &black, &result); err != nil {
+		var timeControl sql.NullString
+		if err := rows.Scan(&white, &black, &result, &timeControl); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		// Categorize time control
+		tc := ""
+		if timeControl.Valid {
+			tc = categorizeTimeControl(timeControl.String)
 		}
 
 		// When filtering, only track stats for the filtered players
@@ -736,10 +793,32 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 		if trackWhite {
 			playerStats[white].Games++
 			playerStats[white].WhiteGames++
+			// Update time control counts
+			switch tc {
+			case "bullet":
+				playerStats[white].BulletGames++
+			case "blitz":
+				playerStats[white].BlitzGames++
+			case "rapid":
+				playerStats[white].RapidGames++
+			case "classical":
+				playerStats[white].ClassicalGames++
+			}
 		}
 		if trackBlack {
 			playerStats[black].Games++
 			playerStats[black].BlackGames++
+			// Update time control counts
+			switch tc {
+			case "bullet":
+				playerStats[black].BulletGames++
+			case "blitz":
+				playerStats[black].BlitzGames++
+			case "rapid":
+				playerStats[black].RapidGames++
+			case "classical":
+				playerStats[black].ClassicalGames++
+			}
 		}
 
 		// Update win/loss/draw counts based on result
@@ -751,6 +830,7 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 			}
 			if trackBlack {
 				playerStats[black].Losses++
+				playerStats[black].BlackLosses++
 			}
 		case "0-1": // Black win
 			if trackBlack {
@@ -759,13 +839,16 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 			}
 			if trackWhite {
 				playerStats[white].Losses++
+				playerStats[white].WhiteLosses++
 			}
 		case "1/2-1/2": // Draw
 			if trackWhite {
 				playerStats[white].Draws++
+				playerStats[white].WhiteDraws++
 			}
 			if trackBlack {
 				playerStats[black].Draws++
+				playerStats[black].BlackDraws++
 			}
 		default: // Unknown result or ongoing game
 			// Skip updating win/loss/draw counts
@@ -779,9 +862,19 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 	// Calculate win rates and convert to slice
 	results := make([]PlayerStats, 0, len(playerStats))
 	for _, stats := range playerStats {
-		// Calculate win rate
+		// Calculate overall win rate
 		if stats.Games > 0 {
 			stats.WinRate = float64(stats.Wins) / float64(stats.Games) * 100.0
+		}
+
+		// Calculate win rate as white
+		if stats.WhiteGames > 0 {
+			stats.WhiteWinRate = float64(stats.WhiteWins) / float64(stats.WhiteGames) * 100.0
+		}
+
+		// Calculate win rate as black
+		if stats.BlackGames > 0 {
+			stats.BlackWinRate = float64(stats.BlackWins) / float64(stats.BlackGames) * 100.0
 		}
 
 		results = append(results, *stats)
@@ -810,8 +903,8 @@ type PositionFrequency struct {
 // GetPositionStats retrieves statistics about positions in the database
 // Only includes positions reached after move 10 (move_number >= 20 half-moves)
 func (db *DB) GetPositionStats(ctx context.Context) (uniqueCount int, topPositions []PositionFrequency, err error) {
-	// Get count of unique positions (after move 10)
-	err = db.conn.QueryRowContext(ctx, "SELECT COUNT(DISTINCT fen) FROM positions WHERE move_number >= 20").Scan(&uniqueCount)
+	// Get count of unique positions (all moves)
+	err = db.conn.QueryRowContext(ctx, "SELECT COUNT(DISTINCT fen) FROM positions").Scan(&uniqueCount)
 	if err != nil {
 		db.logger.Error("failed to get unique position count", "error", err)
 		return 0, nil, fmt.Errorf("failed to get unique position count: %w", err)

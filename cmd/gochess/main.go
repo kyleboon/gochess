@@ -598,18 +598,20 @@ func statsCommand(c *cli.Context) error {
 	switch format {
 	case "csv":
 		// CSV output
-		fmt.Println("Name,Games,Wins,Losses,Draws,WinRate,WhiteGames,BlackGames,WhiteWins,BlackWins")
+		fmt.Println("Name,Games,Wins,Losses,Draws,WinRate,WhiteGames,BlackGames,WhiteWins,BlackWins,WhiteWinRate,BlackWinRate,BulletGames,BlitzGames,RapidGames,ClassicalGames")
 		for _, s := range stats {
-			fmt.Printf("%s,%d,%d,%d,%d,%.1f%%,%d,%d,%d,%d\n",
+			fmt.Printf("%s,%d,%d,%d,%d,%.1f%%,%d,%d,%d,%d,%.1f%%,%.1f%%,%d,%d,%d,%d\n",
 				s.Name, s.Games, s.Wins, s.Losses, s.Draws, s.WinRate,
-				s.WhiteGames, s.BlackGames, s.WhiteWins, s.BlackWins)
+				s.WhiteGames, s.BlackGames, s.WhiteWins, s.BlackWins,
+				s.WhiteWinRate, s.BlackWinRate,
+				s.BulletGames, s.BlitzGames, s.RapidGames, s.ClassicalGames)
 		}
 
 	default:
 		// Table output (default)
-		fmt.Printf("%-20s %-6s %-6s %-6s %-6s %-8s %-6s %-6s\n",
-			"PLAYER", "GAMES", "WINS", "LOSSES", "DRAWS", "WIN RATE", "WHITE", "BLACK")
-		fmt.Println(repeatString("-", 72))
+		fmt.Printf("%-20s %-6s %-6s %-6s %-6s %-8s %-8s %-8s\n",
+			"PLAYER", "GAMES", "WINS", "LOSSES", "DRAWS", "WIN RATE", "AS WHITE", "AS BLACK")
+		fmt.Println(repeatString("-", 88))
 
 		for _, s := range stats {
 			// Truncate long player names
@@ -618,20 +620,47 @@ func statsCommand(c *cli.Context) error {
 				name = name[:17] + "..."
 			}
 
-			fmt.Printf("%-20s %-6d %-6d %-6d %-6d %-7.1f%% %-6d %-6d\n",
+			// Format win rates by color
+			whiteRate := fmt.Sprintf("%.1f%%", s.WhiteWinRate)
+			blackRate := fmt.Sprintf("%.1f%%", s.BlackWinRate)
+
+			fmt.Printf("%-20s %-6d %-6d %-6d %-6d %-7.1f%% %-8s %-8s\n",
 				name, s.Games, s.Wins, s.Losses, s.Draws, s.WinRate,
-				s.WhiteGames, s.BlackGames)
+				whiteRate, blackRate)
 		}
 
 		// Show detailed statistics if only showing one player
 		if len(stats) == 1 {
-			fmt.Printf("\nDetailed statistics for %s:\n", stats[0].Name)
-			fmt.Printf("  As White: %d games, %d wins (%.1f%%)\n",
-				stats[0].WhiteGames, stats[0].WhiteWins,
-				safeDiv(float64(stats[0].WhiteWins), float64(stats[0].WhiteGames))*100)
-			fmt.Printf("  As Black: %d games, %d wins (%.1f%%)\n",
-				stats[0].BlackGames, stats[0].BlackWins,
-				safeDiv(float64(stats[0].BlackWins), float64(stats[0].BlackGames))*100)
+			s := stats[0]
+			fmt.Printf("\nDetailed statistics for %s:\n", s.Name)
+
+			// Win rates by color
+			fmt.Printf("\n  Performance by Color:\n")
+			fmt.Printf("    As White: %d games, %d-%d-%d (W-L-D), %.1f%% win rate\n",
+				s.WhiteGames, s.WhiteWins, s.WhiteLosses, s.WhiteDraws, s.WhiteWinRate)
+			fmt.Printf("    As Black: %d games, %d-%d-%d (W-L-D), %.1f%% win rate\n",
+				s.BlackGames, s.BlackWins, s.BlackLosses, s.BlackDraws, s.BlackWinRate)
+
+			// Time control breakdown
+			if s.BulletGames > 0 || s.BlitzGames > 0 || s.RapidGames > 0 || s.ClassicalGames > 0 {
+				fmt.Printf("\n  Games by Time Control:\n")
+				if s.BulletGames > 0 {
+					fmt.Printf("    Bullet:    %d games (%.1f%%)\n",
+						s.BulletGames, float64(s.BulletGames)/float64(s.Games)*100)
+				}
+				if s.BlitzGames > 0 {
+					fmt.Printf("    Blitz:     %d games (%.1f%%)\n",
+						s.BlitzGames, float64(s.BlitzGames)/float64(s.Games)*100)
+				}
+				if s.RapidGames > 0 {
+					fmt.Printf("    Rapid:     %d games (%.1f%%)\n",
+						s.RapidGames, float64(s.RapidGames)/float64(s.Games)*100)
+				}
+				if s.ClassicalGames > 0 {
+					fmt.Printf("    Classical: %d games (%.1f%%)\n",
+						s.ClassicalGames, float64(s.ClassicalGames)/float64(s.Games)*100)
+				}
+			}
 		}
 	}
 
