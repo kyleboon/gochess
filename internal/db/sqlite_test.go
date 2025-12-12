@@ -464,3 +464,309 @@ func TestInsertGameRecord(t *testing.T) {
 		})
 	}
 }
+func TestGetGameByID(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "gochess-test-getgame-")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
+	if err != nil {
+		t.Fatalf("failed to create test database: %v", err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+
+	t.Run("Game not found", func(t *testing.T) {
+		_, err := db.GetGameByID(ctx, 999)
+		if err == nil {
+			t.Error("expected error for non-existent game")
+		}
+		if !strings.Contains(err.Error(), "game not found") {
+			t.Errorf("expected 'game not found' error, got: %v", err)
+		}
+	})
+
+	// Import a test game
+	pgnContent := `[Event "Test Tournament"]
+[Site "Test Location"]
+[Date "2024.01.15"]
+[Round "1"]
+[White "Alice"]
+[Black "Bob"]
+[Result "1-0"]
+[WhiteElo "1800"]
+[BlackElo "1750"]
+[TimeControl "600+5"]
+[CustomTag "CustomValue"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 1-0
+`
+	pgnFile := tempDir + "/test.pgn"
+	err = os.WriteFile(pgnFile, []byte(pgnContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write PGN file: %v", err)
+	}
+
+	count, errs := db.ImportPGN(ctx, pgnFile)
+	if len(errs) > 0 {
+		t.Fatalf("import errors: %v", errs)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 game imported, got %d", count)
+	}
+
+	t.Run("Valid game retrieval", func(t *testing.T) {
+		game, err := db.GetGameByID(ctx, 1)
+		if err != nil {
+			t.Fatalf("failed to get game: %v", err)
+		}
+
+		// Verify main fields
+		if game["id"] != 1 {
+			t.Errorf("expected id=1, got %v", game["id"])
+		}
+		if game["event"] != "Test Tournament" {
+			t.Errorf("expected event='Test Tournament', got %v", game["event"])
+		}
+		if game["site"] != "Test Location" {
+			t.Errorf("expected site='Test Location', got %v", game["site"])
+		}
+		if game["date"] != "2024.01.15" {
+			t.Errorf("expected date='2024.01.15', got %v", game["date"])
+		}
+		if game["round"] != "1" {
+			t.Errorf("expected round='1', got %v", game["round"])
+		}
+		if game["white"] != "Alice" {
+			t.Errorf("expected white='Alice', got %v", game["white"])
+		}
+		if game["black"] != "Bob" {
+			t.Errorf("expected black='Bob', got %v", game["black"])
+		}
+		if game["result"] != "1-0" {
+			t.Errorf("expected result='1-0', got %v", game["result"])
+		}
+		if game["white_elo"] != 1800 {
+			t.Errorf("expected white_elo=1800, got %v", game["white_elo"])
+		}
+		if game["black_elo"] != 1750 {
+			t.Errorf("expected black_elo=1750, got %v", game["black_elo"])
+		}
+		if game["time_control"] != "600+5" {
+			t.Errorf("expected time_control='600+5', got %v", game["time_control"])
+		}
+
+		// Verify PGN text is present
+		pgnText, ok := game["pgn_text"].(string)
+		if !ok {
+			t.Error("pgn_text should be a string")
+		}
+		if !strings.Contains(pgnText, "1. e4 e5") {
+			t.Error("pgn_text should contain moves")
+		}
+
+		// Verify tags
+		tags, ok := game["tags"].(map[string]string)
+		if !ok {
+			t.Fatal("tags should be a map[string]string")
+		}
+		if tags["CustomTag"] != "CustomValue" {
+			t.Errorf("expected CustomTag='CustomValue', got %v", tags["CustomTag"])
+		}
+	})
+
+	t.Run("Multiple games", func(t *testing.T) {
+		// Import another game
+		pgnContent2 := `[Event "Second Game"]
+[Site "Another Place"]
+[Date "2024.01.16"]
+[Round "2"]
+[White "Charlie"]
+[Black "Dave"]
+[Result "0-1"]
+
+1. d4 d5 0-1
+`
+		pgnFile2 := tempDir + "/test2.pgn"
+		err = os.WriteFile(pgnFile2, []byte(pgnContent2), 0644)
+		if err != nil {
+			t.Fatalf("failed to write second PGN file: %v", err)
+		}
+
+		count, errs := db.ImportPGN(ctx, pgnFile2)
+		if len(errs) > 0 {
+			t.Fatalf("import errors: %v", errs)
+		}
+		if count != 1 {
+			t.Fatalf("expected 1 game imported, got %d", count)
+		}
+
+		// Retrieve second game
+		game, err := db.GetGameByID(ctx, 2)
+		if err != nil {
+			t.Fatalf("failed to get game 2: %v", err)
+		}
+
+		if game["id"] != 2 {
+			t.Errorf("expected id=2, got %v", game["id"])
+		}
+		if game["white"] != "Charlie" {
+			t.Errorf("expected white='Charlie', got %v", game["white"])
+		}
+		if game["black"] != "Dave" {
+			t.Errorf("expected black='Dave', got %v", game["black"])
+		}
+
+		// Verify first game still retrievable
+		game1, err := db.GetGameByID(ctx, 1)
+		if err != nil {
+			t.Fatalf("failed to get game 1: %v", err)
+		}
+		if game1["white"] != "Alice" {
+			t.Errorf("game 1 should still be Alice, got %v", game1["white"])
+		}
+	})
+}
+
+func TestClearGames(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "gochess-test-clear-")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
+	if err != nil {
+		t.Fatalf("failed to create test database: %v", err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+
+	t.Run("Clear empty database", func(t *testing.T) {
+		err := db.ClearGames(ctx)
+		if err != nil {
+			t.Errorf("clearing empty database should not error: %v", err)
+		}
+
+		// Verify count is 0
+		count, err := db.GetGameCount(ctx)
+		if err != nil {
+			t.Fatalf("failed to count games: %v", err)
+		}
+		if count != 0 {
+			t.Errorf("expected 0 games, got %d", count)
+		}
+	})
+
+	// Import some test games
+	pgnContent := `[Event "Game 1"]
+[Site "Site 1"]
+[Date "2024.01.01"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 e5 1-0
+
+[Event "Game 2"]
+[Site "Site 2"]
+[Date "2024.01.02"]
+[White "Player3"]
+[Black "Player4"]
+[Result "0-1"]
+[TimeControl "300+0"]
+
+1. d4 d5 0-1
+
+[Event "Game 3"]
+[Site "Site 3"]
+[Date "2024.01.03"]
+[White "Player5"]
+[Black "Player6"]
+[Result "1/2-1/2"]
+
+1. c4 c5 1/2-1/2
+`
+	pgnFile := tempDir + "/test.pgn"
+	err = os.WriteFile(pgnFile, []byte(pgnContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write PGN file: %v", err)
+	}
+
+	count, errs := db.ImportPGN(ctx, pgnFile)
+	if len(errs) > 0 {
+		t.Fatalf("import errors: %v", errs)
+	}
+	if count != 3 {
+		t.Fatalf("expected 3 games imported, got %d", count)
+	}
+
+	// Verify games were imported
+	gameCount, err := db.GetGameCount(ctx)
+	if err != nil {
+		t.Fatalf("failed to count games: %v", err)
+	}
+	if gameCount != 3 {
+		t.Fatalf("expected 3 games, got %d", gameCount)
+	}
+
+	t.Run("Clear database with games", func(t *testing.T) {
+		err := db.ClearGames(ctx)
+		if err != nil {
+			t.Errorf("failed to clear games: %v", err)
+		}
+
+		// Verify count is 0
+		count, err := db.GetGameCount(ctx)
+		if err != nil {
+			t.Fatalf("failed to count games: %v", err)
+		}
+		if count != 0 {
+			t.Errorf("expected 0 games after clear, got %d", count)
+		}
+
+		// Verify tags were also cleared (cascade)
+		var tagCount int
+		err = db.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM tags").Scan(&tagCount)
+		if err != nil {
+			t.Fatalf("failed to count tags: %v", err)
+		}
+		if tagCount != 0 {
+			t.Errorf("expected 0 tags after clear, got %d", tagCount)
+		}
+
+		// Verify positions were also cleared (cascade)
+		var posCount int
+		err = db.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM positions").Scan(&posCount)
+		if err != nil {
+			t.Fatalf("failed to count positions: %v", err)
+		}
+		if posCount != 0 {
+			t.Errorf("expected 0 positions after clear, got %d", posCount)
+		}
+	})
+
+	t.Run("Re-import after clear", func(t *testing.T) {
+		// Should be able to import again
+		count, errs := db.ImportPGN(ctx, pgnFile)
+		if len(errs) > 0 {
+			t.Fatalf("import errors after clear: %v", errs)
+		}
+		if count != 3 {
+			t.Fatalf("expected 3 games re-imported, got %d", count)
+		}
+
+		// IDs should start from 1 again due to sequence reset
+		game, err := db.GetGameByID(ctx, 1)
+		if err != nil {
+			t.Fatalf("failed to get game after re-import: %v", err)
+		}
+		if game["id"] != 1 {
+			t.Errorf("expected first game to have id=1 after clear, got %v", game["id"])
+		}
+	})
+}

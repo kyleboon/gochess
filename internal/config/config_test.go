@@ -211,3 +211,121 @@ func TestDefaultPaths(t *testing.T) {
 	assert.Contains(t, dbPath, ".gochess")
 	assert.Contains(t, dbPath, "games.db")
 }
+
+func TestLoadOrDefault(t *testing.T) {
+	t.Run("Load existing config", func(t *testing.T) {
+		// Create temporary directory with config
+		tmpDir, err := os.MkdirTemp("", "gochess-config-test")
+		require.NoError(t, err)
+		defer os.RemoveAll(tmpDir)
+
+		// Set HOME to temp directory so DefaultConfigPath uses it
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
+
+		// Create .gochess directory
+		gochessDir := filepath.Join(tmpDir, ".gochess")
+		err = os.MkdirAll(gochessDir, 0755)
+		require.NoError(t, err)
+
+		// Create config file
+		configPath := filepath.Join(gochessDir, "config.yaml")
+		cfg := &Config{
+			DatabasePath: "/custom/path/games.db",
+			ChessCom: &ChessComConfig{
+				Username: "testuser",
+			},
+		}
+		err = cfg.Save(configPath)
+		require.NoError(t, err)
+
+		// Load using LoadOrDefault
+		loaded, err := LoadOrDefault()
+		require.NoError(t, err)
+		assert.Equal(t, "/custom/path/games.db", loaded.DatabasePath)
+		assert.Equal(t, "testuser", loaded.ChessCom.Username)
+	})
+
+	t.Run("Return default when config doesn't exist", func(t *testing.T) {
+		// Create temporary directory without config
+		tmpDir, err := os.MkdirTemp("", "gochess-config-test")
+		require.NoError(t, err)
+		defer os.RemoveAll(tmpDir)
+
+		// Set HOME to temp directory
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
+
+		// Load using LoadOrDefault (should return defaults)
+		loaded, err := LoadOrDefault()
+		require.NoError(t, err)
+		assert.NotNil(t, loaded)
+		assert.Contains(t, loaded.DatabasePath, ".gochess/games.db")
+		assert.Nil(t, loaded.ChessCom)
+		assert.Nil(t, loaded.Lichess)
+	})
+}
+
+func TestSaveDefault(t *testing.T) {
+	// Create temporary directory
+	tmpDir, err := os.MkdirTemp("", "gochess-config-test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Set HOME to temp directory
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", oldHome)
+
+	// Create config
+	cfg := &Config{
+		DatabasePath: "/test/path/games.db",
+		ChessCom: &ChessComConfig{
+			Username: "savetest",
+		},
+	}
+
+	// Save to default location
+	err = cfg.SaveDefault()
+	require.NoError(t, err)
+
+	// Verify file was created
+	expectedPath := filepath.Join(tmpDir, ".gochess", "config.yaml")
+	_, err = os.Stat(expectedPath)
+	require.NoError(t, err)
+
+	// Load and verify
+	loaded, err := Load(expectedPath)
+	require.NoError(t, err)
+	assert.Equal(t, "/test/path/games.db", loaded.DatabasePath)
+	assert.Equal(t, "savetest", loaded.ChessCom.Username)
+}
+
+func TestClearAllLastImports(t *testing.T) {
+	cfg := &Config{
+		LastImport: map[string]time.Time{
+			"lichess:user1":  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			"chesscom:user2": time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+			"lichess:user3":  time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	// Verify we have entries
+	assert.Equal(t, 3, len(cfg.LastImport))
+
+	// Clear all
+	cfg.ClearAllLastImports()
+
+	// Verify all cleared
+	assert.Equal(t, 0, len(cfg.LastImport))
+
+	// Verify can still set new values
+	now := time.Now()
+	cfg.SetLastImport("lichess", "newuser", now)
+	assert.Equal(t, 1, len(cfg.LastImport))
+	gotTime, ok := cfg.GetLastImport("lichess", "newuser")
+	assert.True(t, ok)
+	assert.True(t, now.Equal(gotTime))
+}

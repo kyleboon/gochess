@@ -533,16 +533,16 @@ func (db *DB) SearchGames(ctx context.Context, criteria map[string]string, limit
 func (db *DB) GetGameByID(ctx context.Context, id int) (map[string]interface{}, error) {
 	// Query the game
 	row := db.conn.QueryRowContext(ctx, "SELECT * FROM games WHERE id = ?", id)
-	
+
 	var gameID int
 	var event, site, date, round, white, black, result string
 	var whiteElo, blackElo int
-	var timeControl, pgnText string
+	var timeControl, pgnText, gameHash string
 	var createdAt string
-	
+
 	err := row.Scan(
 		&gameID, &event, &site, &date, &round, &white, &black, &result,
-		&whiteElo, &blackElo, &timeControl, &pgnText, &createdAt,
+		&whiteElo, &blackElo, &timeControl, &pgnText, &gameHash, &createdAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

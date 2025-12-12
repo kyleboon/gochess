@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,7 +53,7 @@ func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("config file not found at %s (run 'gochess config init' to create one)", path)
+			return nil, fmt.Errorf("config file not found at %s (run 'gochess config init' to create one): %w", path, err)
 		}
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -79,7 +80,7 @@ func LoadOrDefault() (*Config, error) {
 
 	cfg, err := Load(configPath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			// Return default config
 			dbPath, err := DefaultDatabasePath()
 			if err != nil {
