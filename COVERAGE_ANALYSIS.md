@@ -17,7 +17,6 @@
 | internal/config | 21.4% | ~ Improved | Medium |
 | internal/chesscom | 18.8% | ~ Improved | Medium |
 | cmd/gochess | 0.0% | ✗ No tests | Medium |
-| cmd/chesstui | 0.0% | ✗ No tests | Low |
 
 ---
 
@@ -160,11 +159,7 @@
 
 ## Low Priority Gaps
 
-### 7. cmd/chesstui (0% coverage)
-
-**Note:** TUI is interactive and difficult to test. Not a priority.
-
-### 8. internal/rampart (62.5% coverage)
+### 7. internal/rampart (62.5% coverage)
 
 **Note:** Test data utilities. Current coverage is acceptable.
 
@@ -189,7 +184,6 @@
 
 ### Lower Priority
 10. CLI command functions (low ROI for testing effort)
-11. TUI testing (complex, interactive)
 
 ---
 
@@ -205,7 +199,7 @@
 - Core libraries (internal/*): Target 70%+ ✓ (currently 77.3%)
 - API clients (chesscom/lichess): Target 50%+ (currently 32.8%/18.8%)
 - Database (internal/db): Target 65%+ (currently 53.4%, close!)
-- CLI/TUI: Remain at 0% (acceptable)
+- CLI: Remain at 0% (acceptable)
 
 ---
 

@@ -129,8 +129,6 @@ gochess import
 - Date range filtering
 - API token authentication
 
-**What's Next:**
-- Optional TUI integration for Lichess browser
 
 ---
 
@@ -140,7 +138,6 @@ For historical context on earlier development work, see git history. Major miles
 - Chess.com API integration
 - PGN parser and database
 - Move generation and validation
-- Terminal UI (TUI) with Bubble Tea
 - SQLite database with duplicate detection
 
 ---

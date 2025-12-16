@@ -66,11 +66,6 @@
   - Most/least successful openings
   - Opening frequency distribution
 
-### Lichess TUI Integration (Optional)
-- [ ] Add Lichess support to TUI
-  - Similar to Chess.com browser
-  - Switch between Chess.com/Lichess sources
-
 ---
 
 ## 🎯 Medium Priority - Analysis & Statistics
@@ -128,15 +123,6 @@
   - JSON
   - CSV (for spreadsheet analysis)
 
-### TUI Enhancements
-- [ ] Add game replay mode with analysis overlay
-  - Show engine evaluation as you step through moves
-  - Highlight mistakes/blunders
-- [ ] Add opening tree visualization in TUI
-- [ ] Add position search from TUI
-- [ ] Improve Chess.com/Lichess browser UX
-  - Better loading states
-  - Progress indicators for bulk downloads
 
 ### Configuration Enhancements
 - [ ] Add automatic scheduled imports (cron-like feature)
@@ -281,8 +267,7 @@
 
 ### Later Enhancements
 7. **Engine Integration** - Adds analysis capabilities
-8. **TUI Improvements** - Better user experience
-9. **Advanced Features** - Tactical patterns, study mode, etc.
+8. **Advanced Features** - Tactical patterns, study mode, etc.
 
 ---
 

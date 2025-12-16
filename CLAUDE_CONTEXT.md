@@ -9,7 +9,6 @@ GoChess is a chess library and toolset written in Go that provides:
 - SQLite-based game database with import/export capabilities
 - Chess.com API integration for downloading game archives
 - Lichess API integration for downloading game archives
-- Terminal UI (TUI) for browsing and playing through games
 - CLI tools for game management and analysis
 
 **Target Users**: Chess enthusiasts, developers building chess applications, analysts working with chess databases.
@@ -31,8 +30,7 @@ GoChess is a chess library and toolset written in Go that provides:
 ```
 gochess/
 ├── cmd/
-│   ├── gochess/        # Main CLI application
-│   └── chesstui/       # Terminal UI application (Bubble Tea)
+│   └── gochess/        # Main CLI application
 ├── internal/
 │   ├── board.go        # Chess board representation and logic
 │   ├── move.go         # Move parsing and notation (algebraic, UCI)
@@ -161,8 +159,7 @@ func TestValidateGameTags(t *testing.T) {
 1. **Perft Tests**: Don't catch insufficient material scenarios (edge case)
 2. **FEN Validation**: Some invalid FENs in testdata cause test failures
 3. **Export All Games**: `db export` only exports single game by ID
-4. **TUI Polish**: Chess.com browser works but could use UX improvements
-5. **Rate Limiting**: Currently no protection against multiple parallel processes hitting Chess.com API
+4. **Rate Limiting**: Currently no protection against multiple parallel processes hitting Chess.com API
 
 ---
 
@@ -237,7 +234,6 @@ db.ImportPGN(context.Background(), testFile)  // ✓
 ```bash
 go build ./...                    # Build all packages
 go build ./cmd/gochess           # Build main CLI
-go build ./cmd/chesstui          # Build TUI app
 ```
 
 ### Testing
@@ -254,9 +250,6 @@ go test -run TestImportPGN ./internal/db  # Run specific test
 ./gochess db import --pgn games.pgn --database ~/.gochess/games.db
 ./gochess chesscom download --username player --year 2024 --month 12 --import-db
 ./gochess db list --database ~/.gochess/games.db
-
-# TUI
-./chesstui
 ```
 
 ### Git Conventions
@@ -307,7 +300,6 @@ go test -run TestImportPGN ./internal/db  # Run specific test
 ## Key Dependencies
 
 - **CLI Framework**: `github.com/urfave/cli/v2`
-- **TUI Framework**: `github.com/charmbracelet/bubbletea`
 - **SQLite Driver**: `github.com/mattn/go-sqlite3` (requires CGO)
 - **Testing**: `github.com/stretchr/testify` (assertions)
 
@@ -340,7 +332,6 @@ go test -run TestImportPGN ./internal/db  # Run specific test
 | Lichess API | `internal/lichess/client.go` |
 | Logging config | `internal/logging/logger.go` |
 | CLI commands | `cmd/gochess/main.go` |
-| TUI screens | `cmd/chesstui/*.go` |
 | Test fixtures | `testdata/` |
 
 ---
