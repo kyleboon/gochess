@@ -1,8 +1,8 @@
 # GoChess Test Coverage Analysis
 
 **Generated:** 2025-12-12
-**Last Updated:** 2025-12-12 (after quick wins)
-**Overall Coverage:** 36.5% of statements (was 34.0%)
+**Last Updated:** 2025-12-12 (after API client tests)
+**Overall Coverage:** 38.8% of statements (was 34.0% → 36.5% → 38.8%)
 
 ## Summary by Package
 
@@ -13,9 +13,9 @@
 | internal/rampart | 62.5% | ✓ Acceptable | Low |
 | internal/pgn | 53.1% | ~ Needs work | Medium |
 | internal/db | 53.4% | ✓ Acceptable | Medium |
-| internal/config | 21.4% | ~ Improved | **High** |
-| internal/lichess | 18.4% | ✗ Low | **High** |
-| internal/chesscom | 5.4% | ✗ Very Low | **High** |
+| internal/lichess | 32.8% | ~ Improved | Medium |
+| internal/config | 21.4% | ~ Improved | Medium |
+| internal/chesscom | 18.8% | ~ Improved | Medium |
 | cmd/gochess | 0.0% | ✗ No tests | Medium |
 | cmd/chesstui | 0.0% | ✗ No tests | Low |
 
@@ -48,50 +48,56 @@
 
 ---
 
-### 2. internal/chesscom (5.4% coverage)
+### 2. internal/chesscom (18.8% coverage)
 
 **Well Tested:**
 - ✓ HTTP retry logic (doRequestWithRetry - 90%)
 - ✓ Client constructors (NewClientWithLogger)
 - ✓ RetryConfig
+- ✓ GetPlayerGames - API method with httptest ✅
+- ✓ GetPlayerGamesPGN - PGN download ✅
+- ✓ GetArchivedMonths - archive listing ✅
 
 **Missing Tests:**
-- ✗ GetPlayerGames - main API method
-- ✗ GetPlayerGamesPGN - PGN download
-- ✗ GetArchivedMonths - archive listing
 - ✗ All converter functions (GamesToDatabase, PGNToDatabase)
 - ✗ All CLI functions (chesscom_cmd.go)
 - ✗ ImportFromConfig - config-based import
 
-**Recommended Actions:**
-1. Add integration tests with httptest for all API methods
-2. Test converter functions with sample game data
-3. Test ImportFromConfig workflow
-4. CLI functions can remain untested
+**Completed:**
+1. ✅ Added integration tests with httptest for all API methods (GetPlayerGames, GetPlayerGamesPGN, GetArchivedMonths)
+2. ✅ Enhanced Client with baseURL field for testing
 
-**Note:** Some tests exist but coverage is misleadingly low. The retry logic is well-tested (90%), suggesting basic client functionality works.
+**Recommended Actions:**
+1. Test converter functions with sample game data
+2. Test ImportFromConfig workflow
+3. CLI functions can remain untested
 
 ---
 
-### 3. internal/lichess (18.4% coverage)
+### 3. internal/lichess (32.8% coverage)
 
 **Well Tested:**
 - ✓ HTTP retry logic (doRequestWithRetry - 90%)
 - ✓ Client constructors
 - ✓ Query parameter building (buildQueryParams - 88.9%)
+- ✓ GetPlayerGamesPGN - main download method ✅
+- ✓ Date range filtering ✅
+- ✓ API token authentication ✅
+- ✓ Filter parameters (rated, perfType, color, max) ✅
+- ✓ Rate limit retry (429 handling) ✅
 
 **Missing Tests:**
-- ✗ GetPlayerGamesPGN - main download method
 - ✗ All CLI functions (lichess_cmd.go)
 - ✗ ImportFromConfig - config-based import
 
-**Recommended Actions:**
-1. Add integration tests with httptest for GetPlayerGamesPGN
-2. Test date range filtering
-3. Test API token authentication
-4. Test ImportFromConfig workflow
+**Completed:**
+1. ✅ Added comprehensive integration tests with httptest for GetPlayerGamesPGN
+2. ✅ Enhanced Client with baseURL field for testing
+3. ✅ Tests cover: basic params, date ranges, API tokens, filters, empty responses, 404s, 429s
 
-**Note:** Better coverage than Chess.com (18.4% vs 5.4%) due to model tests.
+**Recommended Actions:**
+1. Test ImportFromConfig workflow
+2. CLI functions can remain untested
 
 ---
 
@@ -171,9 +177,9 @@
 2. ~~**internal/db/ClearGames** - Database clearing test~~ ✅ Done
 3. ~~**internal/config file operations** - LoadOrDefault, SaveDefault~~ ✅ Done
 
-### Short Term (High Value, Medium Effort)
-4. **internal/chesscom API methods** - Integration tests with httptest
-5. **internal/lichess API methods** - Integration tests with httptest
+### Short Term (High Value, Medium Effort) ✅ COMPLETED
+4. ~~**internal/chesscom API methods** - Integration tests with httptest~~ ✅ Done
+5. ~~**internal/lichess API methods** - Integration tests with httptest~~ ✅ Done
 6. **internal/chesscom/lichess converters** - Data conversion tests
 
 ### Medium Term (Medium Value, Higher Effort)
@@ -189,14 +195,16 @@
 
 ## Coverage Goals
 
-**Current:** 36.5% (was 34.0%)
-**Quick Wins Progress:** +2.5% from 3 tests
+**Current:** 38.8% (was 34.0% → 36.5% → 38.8%)
+**Quick Wins Progress:** +2.5% (db & config tests)
+**API Client Tests Progress:** +2.3% (chesscom & lichess tests)
+**Total Improvement:** +4.8%
 **Target:** 60%+ (achievable with remaining recommendations)
 
 **Breakdown:**
-- Core libraries (internal/*): Target 70%+
-- API clients (chesscom/lichess): Target 50%+
-- Database (internal/db): Target 65%+
+- Core libraries (internal/*): Target 70%+ ✓ (currently 77.3%)
+- API clients (chesscom/lichess): Target 50%+ (currently 32.8%/18.8%)
+- Database (internal/db): Target 65%+ (currently 53.4%, close!)
 - CLI/TUI: Remain at 0% (acceptable)
 
 ---
@@ -244,15 +252,21 @@ func TestLoadOrDefault(t *testing.T) {
 
 ## Conclusion
 
-The project has good coverage of core chess logic (77.3%) and excellent coverage of logging (90.5%). The main gaps are in:
+The project has good coverage of core chess logic (77.3%) and excellent coverage of logging (90.5%).
 
-1. **API integration layers** (chesscom: 5.4%, lichess: 18.4%)
-2. **Configuration management** (14.3%)
-3. **Database query functions** (some untested)
+**Recent Progress:**
+- Overall coverage improved from 34.0% → 38.8% (+4.8%)
+- Chess.com client: 5.4% → 18.8% (+13.4%)
+- Lichess client: 18.4% → 32.8% (+14.4%)
+- Database operations: Added GetGameByID and ClearGames tests
+- Config operations: Added LoadOrDefault, SaveDefault, ClearAllLastImports tests
 
-These are all **high-value targets** for testing because they:
-- Interact with external systems (APIs, files)
-- Are prone to edge cases
-- Are actively used features
+**Remaining gaps:**
+1. **API integration layers** (chesscom: 18.8%, lichess: 32.8%) - Still need converter function tests
+2. **Configuration management** (21.4%) - Need ImportFromConfig tests
+3. **Database query functions** (53.4%) - Close to target, may need ParsePGNFile tests
 
-Following the recommendations above would bring overall coverage to **60%+** while focusing on the most critical code paths.
+**Next steps** to reach 60%+ coverage:
+1. Test converter functions (GamesToDatabase, PGNToDatabase)
+2. Test ImportFromConfig workflow (end-to-end)
+3. Additional PGN variation handling tests

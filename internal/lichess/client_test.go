@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -476,4 +477,245 @@ func intPtr(i int) *int {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func TestClient_GetPlayerGamesPGN(t *testing.T) {
+	t.Run("Success with basic params", func(t *testing.T) {
+		// Note: The client filters out blank lines, so expected PGN has no blank lines
+		expectedPGN := `[Event "Rated Blitz game"]
+[Site "https://lichess.org/abc123"]
+[Date "2024.01.01"]
+[White "player1"]
+[Black "player2"]
+[Result "1-0"]
+1. e4 e5 2. Nf3 Nc6 1-0
+[Event "Rated Rapid game"]
+[Site "https://lichess.org/def456"]
+[Date "2024.01.02"]
+[White "player3"]
+[Black "player4"]
+[Result "0-1"]
+1. d4 d5 0-1
+`
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Verify path
+			if !strings.Contains(r.URL.Path, "/games/user/testuser") {
+				t.Errorf("unexpected path: %s", r.URL.Path)
+			}
+
+			// Verify headers
+			if r.Header.Get("Accept") != "application/x-chess-pgn" {
+				t.Errorf("expected Accept header for PGN")
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(expectedPGN))
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL
+		params := GamesParams{
+			Username: "testuser",
+		}
+
+		pgn, err := client.GetPlayerGamesPGN(context.Background(), params)
+
+		if err != nil {
+			t.Fatalf("expected success, got error: %v", err)
+		}
+		if pgn != expectedPGN {
+			t.Errorf("PGN mismatch.\nExpected:\n%s\nGot:\n%s", expectedPGN, pgn)
+		}
+	})
+
+	t.Run("Success with date range", func(t *testing.T) {
+		since := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli()
+		until := time.Date(2024, 1, 31, 23, 59, 59, 0, time.UTC).UnixMilli()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Verify query parameters
+			query := r.URL.Query()
+			if query.Get("since") != strconv.FormatInt(since, 10) {
+				t.Errorf("expected since=%d, got %s", since, query.Get("since"))
+			}
+			if query.Get("until") != strconv.FormatInt(until, 10) {
+				t.Errorf("expected until=%d, got %s", until, query.Get("until"))
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL
+		params := GamesParams{
+			Username: "testuser",
+			Since:    &since,
+			Until:    &until,
+		}
+
+		_, err := client.GetPlayerGamesPGN(context.Background(), params)
+
+		if err != nil {
+			t.Fatalf("expected success, got error: %v", err)
+		}
+	})
+
+	t.Run("Success with API token", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Verify authorization header
+			auth := r.Header.Get("Authorization")
+			expectedAuth := "Bearer test-token-123"
+			if auth != expectedAuth {
+				t.Errorf("expected Authorization: %s, got: %s", expectedAuth, auth)
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL
+		client.SetAPIToken("test-token-123")
+
+		params := GamesParams{
+			Username: "testuser",
+		}
+
+		_, err := client.GetPlayerGamesPGN(context.Background(), params)
+
+		if err != nil {
+			t.Fatalf("expected success, got error: %v", err)
+		}
+	})
+
+	t.Run("Success with filters", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			query := r.URL.Query()
+
+			// Verify filter parameters
+			if query.Get("rated") != "true" {
+				t.Errorf("expected rated=true, got %s", query.Get("rated"))
+			}
+			if query.Get("perfType") != "blitz" {
+				t.Errorf("expected perfType=blitz, got %s", query.Get("perfType"))
+			}
+			if query.Get("color") != "white" {
+				t.Errorf("expected color=white, got %s", query.Get("color"))
+			}
+			if query.Get("max") != "50" {
+				t.Errorf("expected max=50, got %s", query.Get("max"))
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL
+
+		rated := true
+		max := 50
+
+		params := GamesParams{
+			Username: "testuser",
+			Rated:    &rated,
+			PerfType: "blitz",
+			Color:    "white",
+			Max:      &max,
+		}
+
+		_, err := client.GetPlayerGamesPGN(context.Background(), params)
+
+		if err != nil {
+			t.Fatalf("expected success, got error: %v", err)
+		}
+	})
+
+	t.Run("Empty PGN response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(""))
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL
+		params := GamesParams{
+			Username: "newuser",
+		}
+
+		pgn, err := client.GetPlayerGamesPGN(context.Background(), params)
+
+		if err != nil {
+			t.Fatalf("expected success with empty PGN, got error: %v", err)
+		}
+		if pgn != "" {
+			t.Errorf("expected empty string, got: %s", pgn)
+		}
+	})
+
+	t.Run("404 Not Found", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL
+		params := GamesParams{
+			Username: "nonexistent",
+		}
+
+		_, err := client.GetPlayerGamesPGN(context.Background(), params)
+
+		if err == nil {
+			t.Error("expected error for 404 response")
+		}
+	})
+
+	t.Run("429 Rate Limit", func(t *testing.T) {
+		var requestCount int
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestCount++
+			if requestCount == 1 {
+				w.WriteHeader(http.StatusTooManyRequests)
+				return
+			}
+			// Second request succeeds
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL
+		client.SetRetryConfig(RetryConfig{
+			MaxRetries:     2,
+			InitialBackoff: 10 * time.Millisecond,
+			MaxBackoff:     50 * time.Millisecond,
+			BackoffFactor:  2.0,
+		})
+
+		params := GamesParams{
+			Username: "testuser",
+		}
+
+		pgn, err := client.GetPlayerGamesPGN(context.Background(), params)
+
+		if err != nil {
+			t.Fatalf("expected success after retry, got error: %v", err)
+		}
+		if pgn == "" {
+			t.Error("expected non-empty PGN")
+		}
+		if requestCount != 2 {
+			t.Errorf("expected 2 requests (1 fail + 1 retry), got %d", requestCount)
+		}
+	})
 }

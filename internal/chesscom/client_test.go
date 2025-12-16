@@ -218,3 +218,149 @@ func TestDefaultRetryConfig(t *testing.T) {
 		t.Errorf("expected BackoffFactor=2.0, got %f", config.BackoffFactor)
 	}
 }
+
+func TestClient_GetPlayerGames(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Verify request path
+			expectedPath := "/pub/player/testuser/games/2024/01"
+			if r.URL.Path != expectedPath {
+				t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+			}
+
+			// Return sample JSON response
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"games": [
+					{
+						"url": "https://www.chess.com/game/live/123",
+						"pgn": "[Event \"Live Chess\"]\n1. e4 e5",
+						"time_control": "600",
+						"end_time": 1609459200,
+						"white": {"username": "player1", "rating": 1500},
+						"black": {"username": "player2", "rating": 1510}
+					}
+				]
+			}`))
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL + "/pub"
+		games, err := client.GetPlayerGames(context.Background(), "testuser", 2024, 1)
+
+		if err != nil {
+			t.Fatalf("expected success, got error: %v", err)
+		}
+		if games == nil {
+			t.Fatal("expected games response, got nil")
+		}
+		if len(games.Games) != 1 {
+			t.Errorf("expected 1 game, got %d", len(games.Games))
+		}
+	})
+
+	t.Run("404 Not Found", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL + "/pub"
+		_, err := client.GetPlayerGames(context.Background(), "nonexistent", 2024, 1)
+
+		if err == nil {
+			t.Error("expected error for 404 response")
+		}
+	})
+}
+
+func TestClient_GetPlayerGamesPGN(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		expectedPGN := "[Event \"Test\"]\n1. e4 e5 1-0\n"
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			expectedPath := "/pub/player/testuser/games/2024/01/pgn"
+			if r.URL.Path != expectedPath {
+				t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(expectedPGN))
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL + "/pub"
+		pgn, err := client.GetPlayerGamesPGN(context.Background(), "testuser", 2024, 1)
+
+		if err != nil {
+			t.Fatalf("expected success, got error: %v", err)
+		}
+		if pgn != expectedPGN {
+			t.Errorf("expected PGN %q, got %q", expectedPGN, pgn)
+		}
+	})
+
+	t.Run("404 Not Found", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL + "/pub"
+		_, err := client.GetPlayerGamesPGN(context.Background(), "nonexistent", 2024, 1)
+
+		if err == nil {
+			t.Error("expected error for 404 response")
+		}
+	})
+}
+
+func TestClient_GetArchivedMonths(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			expectedPath := "/pub/player/testuser/games/archives"
+			if r.URL.Path != expectedPath {
+				t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"archives": [
+					"https://api.chess.com/pub/player/testuser/games/2024/01",
+					"https://api.chess.com/pub/player/testuser/games/2024/02"
+				]
+			}`))
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL + "/pub"
+		archives, err := client.GetArchivedMonths(context.Background(), "testuser")
+
+		if err != nil {
+			t.Fatalf("expected success, got error: %v", err)
+		}
+		if len(archives.Archives) != 2 {
+			t.Errorf("expected 2 archives, got %d", len(archives.Archives))
+		}
+	})
+
+	t.Run("404 Not Found", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		client := NewClientWithLogger(logging.Discard())
+		client.baseURL = server.URL + "/pub"
+		_, err := client.GetArchivedMonths(context.Background(), "nonexistent")
+
+		if err == nil {
+			t.Error("expected error for 404 response")
+		}
+	})
+}

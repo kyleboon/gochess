@@ -62,6 +62,7 @@ type Client struct {
 	logger      *slog.Logger
 	retryConfig RetryConfig
 	apiToken    string
+	baseURL     string // Base URL for API requests (exposed for testing)
 }
 
 // NewClient creates a new Lichess API client with default settings.
@@ -77,6 +78,7 @@ func NewClientWithLogger(logger *slog.Logger) *Client {
 		},
 		logger:      logger,
 		retryConfig: DefaultRetryConfig(),
+		baseURL:     baseURL,
 	}
 }
 
@@ -153,7 +155,7 @@ func (c *Client) doRequestWithRetry(ctx context.Context, req *http.Request) (*ht
 // Use GamesParams to configure filters and options for the request.
 func (c *Client) GetPlayerGamesPGN(ctx context.Context, params GamesParams) (string, error) {
 	// Build the URL with query parameters
-	apiURL := fmt.Sprintf("%s/games/user/%s", baseURL, params.Username)
+	apiURL := fmt.Sprintf("%s/games/user/%s", c.baseURL, params.Username)
 	queryParams := c.buildQueryParams(params)
 
 	if len(queryParams) > 0 {

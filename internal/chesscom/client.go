@@ -63,6 +63,7 @@ type Client struct {
 	httpClient  *http.Client
 	logger      *slog.Logger
 	retryConfig RetryConfig
+	baseURL     string // Base URL for API requests (exposed for testing)
 }
 
 // NewClient creates a new Chess.com API client with default settings.
@@ -78,6 +79,7 @@ func NewClientWithLogger(logger *slog.Logger) *Client {
 		},
 		logger:      logger,
 		retryConfig: DefaultRetryConfig(),
+		baseURL:     baseURL,
 	}
 }
 
@@ -148,7 +150,7 @@ func (c *Client) doRequestWithRetry(ctx context.Context, req *http.Request) (*ht
 
 // GetPlayerGames fetches a list of games for a specific user in a given month and year.
 func (c *Client) GetPlayerGames(ctx context.Context, username string, year, month int) (*GamesResponse, error) {
-	url := fmt.Sprintf("%s/player/%s/games/%d/%02d", baseURL, username, year, month)
+	url := fmt.Sprintf("%s/player/%s/games/%d/%02d", c.baseURL, username, year, month)
 	c.logger.Info("fetching player games", "username", username, "year", year, "month", month, "url", url)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -189,7 +191,7 @@ func (c *Client) GetPlayerGames(ctx context.Context, username string, year, mont
 
 // GetPlayerGamesPGN downloads the PGN file containing all games for a specific user in a given month and year.
 func (c *Client) GetPlayerGamesPGN(ctx context.Context, username string, year, month int) (string, error) {
-	url := fmt.Sprintf("%s/player/%s/games/%d/%02d/pgn", baseURL, username, year, month)
+	url := fmt.Sprintf("%s/player/%s/games/%d/%02d/pgn", c.baseURL, username, year, month)
 	c.logger.Info("fetching player games PGN", "username", username, "year", year, "month", month, "url", url)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -224,7 +226,7 @@ func (c *Client) GetPlayerGamesPGN(ctx context.Context, username string, year, m
 
 // GetArchivedMonths returns a list of monthly archives available for a player.
 func (c *Client) GetArchivedMonths(ctx context.Context, username string) (*ArchivesResponse, error) {
-	url := fmt.Sprintf("%s/player/%s/games/archives", baseURL, username)
+	url := fmt.Sprintf("%s/player/%s/games/archives", c.baseURL, username)
 	c.logger.Info("fetching archived months", "username", username, "url", url)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
