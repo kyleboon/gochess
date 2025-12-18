@@ -664,6 +664,75 @@ func statsCommand(c *cli.Context) error {
 		}
 	}
 
+	// Get and display opening statistics (only in table format)
+	if format == "table" {
+		var openingStats []db.OpeningStats
+		if len(players) > 0 {
+			openingStats, err = database.GetOpeningStatsFiltered(c.Context, players)
+		} else {
+			openingStats, err = database.GetOpeningStats(c.Context)
+		}
+
+		if err != nil {
+			fmt.Printf("\nWarning: Failed to get opening statistics: %v\n", err)
+		} else if len(openingStats) > 0 {
+			fmt.Printf("\nOpening Statistics:\n")
+
+			// Show top 10 most played openings
+			displayCount := 10
+			if len(openingStats) < displayCount {
+				displayCount = len(openingStats)
+			}
+
+			fmt.Printf("\n  Top %d Most Played Openings:\n", displayCount)
+			fmt.Printf("  %-6s %-40s %-6s %-7s %-8s %-8s\n", "ECO", "OPENING", "GAMES", "WIN%%", "AS WHITE", "AS BLACK")
+			fmt.Println("  " + repeatString("-", 90))
+
+			for i := 0; i < displayCount; i++ {
+				op := openingStats[i]
+				// Truncate long opening names
+				name := op.OpeningName
+				if len(name) > 40 {
+					name = name[:37] + "..."
+				}
+
+				whiteRate := fmt.Sprintf("%.1f%%", op.WhiteWinRate)
+				blackRate := fmt.Sprintf("%.1f%%", op.BlackWinRate)
+
+				fmt.Printf("  %-6s %-40s %-6d %-6.1f%% %-8s %-8s\n",
+					op.ECOCode, name, op.Games, op.WinRate, whiteRate, blackRate)
+			}
+
+			// Show detailed stats for single player
+			if len(stats) == 1 && len(openingStats) > 0 {
+				s := stats[0]
+				fmt.Printf("\n  Opening Performance for %s:\n", s.Name)
+
+				// Best and worst openings (with minimum 3 games)
+				var best, worst *db.OpeningStats
+				for i := range openingStats {
+					if openingStats[i].Games >= 3 {
+						if best == nil || openingStats[i].WinRate > best.WinRate {
+							best = &openingStats[i]
+						}
+						if worst == nil || openingStats[i].WinRate < worst.WinRate {
+							worst = &openingStats[i]
+						}
+					}
+				}
+
+				if best != nil {
+					fmt.Printf("    Best opening:  %s (%s) - %d games, %.1f%% win rate\n",
+						best.ECOCode, best.OpeningName, best.Games, best.WinRate)
+				}
+				if worst != nil && worst.ECOCode != best.ECOCode {
+					fmt.Printf("    Worst opening: %s (%s) - %d games, %.1f%% win rate\n",
+						worst.ECOCode, worst.OpeningName, worst.Games, worst.WinRate)
+				}
+			}
+		}
+	}
+
 	// Get and display position statistics (only in table format)
 	if format == "table" {
 		uniqueCount, topPositions, err := database.GetPositionStats(c.Context)
@@ -675,17 +744,33 @@ func statsCommand(c *cli.Context) error {
 
 			if len(topPositions) > 0 {
 				fmt.Printf("\n  Top 10 Most Common Positions (after move 10):\n")
-				fmt.Printf("  %-6s %-6s %-6s %-6s %s\n", "COUNT", "WHITE%", "BLACK%", "DRAW%", "FEN")
-				fmt.Println("  " + repeatString("-", 100))
+				fmt.Printf("  %-6s %-6s %-6s %-6s %-6s %-30s %s\n", "COUNT", "WHITE%", "BLACK%", "DRAW%", "ECO", "OPENING", "FEN")
+				fmt.Println("  " + repeatString("-", 110))
 
 				for _, pos := range topPositions {
 					// Truncate very long FEN strings for display
 					fen := pos.FEN
-					if len(fen) > 60 {
-						fen = fen[:57] + "..."
+					if len(fen) > 40 {
+						fen = fen[:37] + "..."
 					}
-					fmt.Printf("  %-6d %-6.1f %-6.1f %-6.1f %s\n",
-						pos.Count, pos.WhiteWinPct, pos.BlackWinPct, pos.DrawPct, fen)
+
+					// Truncate long opening names
+					opening := pos.OpeningName
+					if len(opening) > 30 {
+						opening = opening[:27] + "..."
+					}
+
+					// Default to "-" if ECO code is not available
+					eco := pos.ECOCode
+					if eco == "" {
+						eco = "-"
+					}
+					if opening == "" {
+						opening = "-"
+					}
+
+					fmt.Printf("  %-6d %-6.1f %-6.1f %-6.1f %-6s %-30s %s\n",
+						pos.Count, pos.WhiteWinPct, pos.BlackWinPct, pos.DrawPct, eco, opening, fen)
 				}
 			}
 		}

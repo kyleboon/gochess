@@ -342,8 +342,8 @@ func TestInsertGameRecord(t *testing.T) {
 	stmtGame, err := tx.PrepareContext(ctx, `
 		INSERT INTO games (
 			event, site, date, round, white, black, result,
-			white_elo, black_elo, time_control, pgn_text, game_hash
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			white_elo, black_elo, time_control, pgn_text, game_hash, eco_code, opening_name
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		t.Fatalf("failed to prepare game statement: %v", err)
@@ -426,7 +426,7 @@ func TestInsertGameRecord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gameID, err := insertGameRecord(ctx, tx, stmtGame, stmtTag, tt.game, tt.gameText, tt.gameHash)
+			gameID, err := insertGameRecord(ctx, tx, stmtGame, stmtTag, tt.game, tt.gameText, tt.gameHash, "", "")
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("insertGameRecord() expected error but got nil")

@@ -13,6 +13,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/kyleboon/gochess/internal/eco"
 	"github.com/kyleboon/gochess/internal/logging"
 	"github.com/kyleboon/gochess/internal/pgn"
 )
@@ -21,6 +22,7 @@ import (
 type DB struct {
 	conn   *sql.DB
 	logger *slog.Logger
+	ecoDB  *eco.Database
 }
 
 // New creates a new SQLite database connection
@@ -44,9 +46,18 @@ func NewWithLogger(dbPath string, logger *slog.Logger) (*DB, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
+	// Initialize ECO database
+	ecoDB, err := eco.NewDatabaseWithLogger(logger)
+	if err != nil {
+		conn.Close()
+		logger.Error("failed to initialize ECO database", "error", err)
+		return nil, fmt.Errorf("failed to initialize ECO database: %w", err)
+	}
+
 	db := &DB{
 		conn:   conn,
 		logger: logger,
+		ecoDB:  ecoDB,
 	}
 
 	if err := db.createTables(); err != nil {
@@ -101,6 +112,17 @@ func (db *DB) createTables() error {
 		return fmt.Errorf("failed to add game_hash column: %w", err)
 	}
 
+	// Add ECO opening classification columns
+	err = db.addColumnIfNotExists("games", "eco_code TEXT")
+	if err != nil {
+		return fmt.Errorf("failed to add eco_code column: %w", err)
+	}
+
+	err = db.addColumnIfNotExists("games", "opening_name TEXT")
+	if err != nil {
+		return fmt.Errorf("failed to add opening_name column: %w", err)
+	}
+
 	// Create tags table for additional metadata
 	_, err = db.conn.Exec(`
 		CREATE TABLE IF NOT EXISTS tags (
@@ -131,14 +153,27 @@ func (db *DB) createTables() error {
 		return fmt.Errorf("failed to create positions table: %w", err)
 	}
 
+	// Add ECO opening classification columns to positions
+	err = db.addColumnIfNotExists("positions", "eco_code TEXT")
+	if err != nil {
+		return fmt.Errorf("failed to add eco_code column to positions: %w", err)
+	}
+
+	err = db.addColumnIfNotExists("positions", "opening_name TEXT")
+	if err != nil {
+		return fmt.Errorf("failed to add opening_name column to positions: %w", err)
+	}
+
 	// Create index on common search fields
 	_, err = db.conn.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_games_players ON games(white, black);
 		CREATE INDEX IF NOT EXISTS idx_games_date ON games(date);
 		CREATE INDEX IF NOT EXISTS idx_tags ON tags(tag_name, tag_value);
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_game_hash ON games(game_hash);
+		CREATE INDEX IF NOT EXISTS idx_games_eco ON games(eco_code);
 		CREATE INDEX IF NOT EXISTS idx_positions_fen ON positions(fen);
 		CREATE INDEX IF NOT EXISTS idx_positions_game_id ON positions(game_id);
+		CREATE INDEX IF NOT EXISTS idx_positions_eco ON positions(eco_code);
 	`)
 
 	return err
@@ -248,7 +283,7 @@ func checkDuplicateGame(tx *sql.Tx, gameHash string) (bool, error) {
 }
 
 // insertGameRecord inserts a game and its tags into the database and returns the game ID
-func insertGameRecord(ctx context.Context, tx *sql.Tx, stmtGame, stmtTag *sql.Stmt, game *pgn.Game, gameText, gameHash string) (int64, error) {
+func insertGameRecord(ctx context.Context, tx *sql.Tx, stmtGame, stmtTag *sql.Stmt, game *pgn.Game, gameText, gameHash, ecoCode, openingName string) (int64, error) {
 	// Parse ELO ratings
 	whiteElo, _ := strconv.Atoi(game.Tags["WhiteElo"])
 	blackElo, _ := strconv.Atoi(game.Tags["BlackElo"])
@@ -258,7 +293,7 @@ func insertGameRecord(ctx context.Context, tx *sql.Tx, stmtGame, stmtTag *sql.St
 		game.Tags["Event"], game.Tags["Site"], game.Tags["Date"], game.Tags["Round"],
 		game.Tags["White"], game.Tags["Black"], game.Tags["Result"],
 		whiteElo, blackElo, game.Tags["TimeControl"],
-		gameText, gameHash,
+		gameText, gameHash, ecoCode, openingName,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("error inserting game: %w", err)
@@ -280,9 +315,9 @@ func insertGameRecord(ctx context.Context, tx *sql.Tx, stmtGame, stmtTag *sql.St
 }
 
 // insertPositions inserts all positions for a game into the database
-func insertPositions(ctx context.Context, tx *sql.Tx, stmtPosition *sql.Stmt, gameID int64, positions []Position) error {
+func insertPositions(ctx context.Context, tx *sql.Tx, stmtPosition *sql.Stmt, gameID int64, positions []Position, ecoCode, openingName string) error {
 	for _, pos := range positions {
-		_, err := stmtPosition.Exec(gameID, pos.MoveNumber, pos.FEN, pos.NextMove, nil)
+		_, err := stmtPosition.Exec(gameID, pos.MoveNumber, pos.FEN, pos.NextMove, nil, ecoCode, openingName)
 		if err != nil {
 			return fmt.Errorf("error inserting position at move %d: %w", pos.MoveNumber, err)
 		}
@@ -339,8 +374,8 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 	stmtGame, err := tx.PrepareContext(ctx, `
 		INSERT INTO games (
 			event, site, date, round, white, black, result,
-			white_elo, black_elo, time_control, pgn_text, game_hash
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			white_elo, black_elo, time_control, pgn_text, game_hash, eco_code, opening_name
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		tx.Rollback()
@@ -361,8 +396,8 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 	defer stmtTag.Close()
 
 	stmtPosition, err := tx.PrepareContext(ctx, `
-		INSERT INTO positions (game_id, move_number, fen, next_move, evaluation)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO positions (game_id, move_number, fen, next_move, evaluation, eco_code, opening_name)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		tx.Rollback()
@@ -412,24 +447,40 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 			continue
 		}
 
+		// Parse moves for ECO classification and position extraction
+		var ecoCode, openingName string
+		if err := pgnDB.ParseMoves(game); err != nil {
+			db.logger.Warn("failed to parse moves for game",
+				"event", game.Tags["Event"], "error", err)
+			// Don't fail the import if move parsing fails
+		} else {
+			// Classify opening using ECO database
+			if game.Root != nil && game.Root.Next != nil {
+				// Extract SAN moves from the game tree
+				moveStrs := extractMoveStrings(game)
+				if len(moveStrs) > 0 {
+					ecoCode, openingName, _ = db.ecoDB.Classify(moveStrs)
+					if ecoCode != "" {
+						db.logger.Debug("opening classified",
+							"eco", ecoCode, "opening", openingName, "event", game.Tags["Event"])
+					}
+				}
+			}
+		}
+
 		// Insert game and tags
-		gameID, err := insertGameRecord(ctx, tx, stmtGame, stmtTag, game, currentGameText, gameHash)
+		gameID, err := insertGameRecord(ctx, tx, stmtGame, stmtTag, game, currentGameText, gameHash, ecoCode, openingName)
 		if err != nil {
 			dbErr := fmt.Errorf("game %d (event: %s): %w", i+1, game.Tags["Event"], err)
 			allErrors = append(allErrors, &PGNImportError{OriginalError: dbErr, PGNText: currentGameText})
 			continue
 		}
 
-		// Parse moves and extract positions
-		if err := pgnDB.ParseMoves(game); err != nil {
-			db.logger.Warn("failed to parse moves for game, skipping position storage",
-				"game_id", gameID, "event", game.Tags["Event"], "error", err)
-			// Don't fail the import if move parsing fails, just skip position storage
-		} else {
-			// Extract and insert positions
+		// Extract and insert positions (if moves were parsed successfully)
+		if game.Root != nil && game.Root.Next != nil {
 			positions := ExtractPositions(game)
 			if len(positions) > 0 {
-				if err := insertPositions(ctx, tx, stmtPosition, gameID, positions); err != nil {
+				if err := insertPositions(ctx, tx, stmtPosition, gameID, positions, ecoCode, openingName); err != nil {
 					db.logger.Warn("failed to insert positions for game",
 						"game_id", gameID, "event", game.Tags["Event"], "error", err)
 					// Don't fail the import if position storage fails
@@ -539,10 +590,11 @@ func (db *DB) GetGameByID(ctx context.Context, id int) (map[string]interface{}, 
 	var whiteElo, blackElo int
 	var timeControl, pgnText, gameHash string
 	var createdAt string
+	var ecoCode, openingName sql.NullString
 
 	err := row.Scan(
 		&gameID, &event, &site, &date, &round, &white, &black, &result,
-		&whiteElo, &blackElo, &timeControl, &pgnText, &gameHash, &createdAt,
+		&whiteElo, &blackElo, &timeControl, &pgnText, &createdAt, &gameHash, &ecoCode, &openingName,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -566,6 +618,14 @@ func (db *DB) GetGameByID(ctx context.Context, id int) (map[string]interface{}, 
 		"time_control": timeControl,
 		"pgn_text":     pgnText,
 		"created_at":   createdAt,
+	}
+
+	// Add ECO fields if available
+	if ecoCode.Valid {
+		game["eco_code"] = ecoCode.String
+	}
+	if openingName.Valid {
+		game["opening_name"] = openingName.String
 	}
 	
 	// Get all tags
@@ -664,6 +724,23 @@ type PlayerStats struct {
 	BlitzGames    int     // Games in blitz time control
 	RapidGames    int     // Games in rapid time control
 	ClassicalGames int    // Games in classical/daily time control
+}
+
+// OpeningStats represents statistics for a chess opening
+type OpeningStats struct {
+	ECOCode      string  // ECO code (e.g., "C50")
+	OpeningName  string  // Opening name (e.g., "Italian Game")
+	Games        int     // Total games with this opening
+	Wins         int     // Wins with this opening
+	Losses       int     // Losses with this opening
+	Draws        int     // Draws with this opening
+	WinRate      float64 // Win rate as a percentage (0-100)
+	WhiteGames   int     // Games where player was white
+	BlackGames   int     // Games where player was black
+	WhiteWins    int     // Wins as white
+	BlackWins    int     // Wins as black
+	WhiteWinRate float64 // Win rate as white (0-100)
+	BlackWinRate float64 // Win rate as black (0-100)
 }
 
 // categorizeTimeControl categorizes a time control string into bullet/blitz/rapid/classical
@@ -888,6 +965,166 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 	return results, nil
 }
 
+// GetOpeningStats retrieves statistics for all openings in the database
+func (db *DB) GetOpeningStats(ctx context.Context) ([]OpeningStats, error) {
+	return db.GetOpeningStatsFiltered(ctx, nil)
+}
+
+// GetOpeningStatsFiltered retrieves statistics for specific players' games with openings
+// If players is nil or empty, returns stats for all players
+func (db *DB) GetOpeningStatsFiltered(ctx context.Context, players []string) ([]OpeningStats, error) {
+	// Build query based on whether we're filtering by players
+	var query string
+	var args []interface{}
+
+	if len(players) == 0 {
+		// Query all games with ECO codes
+		query = `
+			SELECT eco_code, opening_name, white, black, result
+			FROM games
+			WHERE eco_code IS NOT NULL AND eco_code != ''
+			AND white != '' AND black != ''
+		`
+	} else {
+		// Query games for specific players
+		placeholders := make([]string, len(players))
+		args = make([]interface{}, len(players))
+		for i, player := range players {
+			placeholders[i] = "?"
+			args[i] = player
+		}
+		playerList := strings.Join(placeholders, ",")
+		query = fmt.Sprintf(`
+			SELECT eco_code, opening_name, white, black, result
+			FROM games
+			WHERE (white IN (%s) OR black IN (%s))
+			AND eco_code IS NOT NULL AND eco_code != ''
+			AND white != '' AND black != ''
+		`, playerList, playerList)
+		args = append(args, args...) // Duplicate args for both IN clauses
+	}
+
+	rows, err := db.conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query games: %w", err)
+	}
+	defer rows.Close()
+
+	// Map to track opening statistics (keyed by ECO code)
+	openingStats := make(map[string]*OpeningStats)
+
+	// Create a set of filtered players for quick lookup
+	filterSet := make(map[string]bool)
+	for _, player := range players {
+		filterSet[player] = true
+	}
+	isFiltered := len(players) > 0
+
+	// Process each game
+	for rows.Next() {
+		var ecoCode, openingName, white, black, result string
+		if err := rows.Scan(&ecoCode, &openingName, &white, &black, &result); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		// Initialize opening stats if not yet tracked
+		if _, ok := openingStats[ecoCode]; !ok {
+			openingStats[ecoCode] = &OpeningStats{
+				ECOCode:     ecoCode,
+				OpeningName: openingName,
+			}
+		}
+
+		stats := openingStats[ecoCode]
+
+		// When filtering, only count games where the filtered player(s) participated
+		whiteIsTracked := !isFiltered || filterSet[white]
+		blackIsTracked := !isFiltered || filterSet[black]
+
+		// Skip if neither player is being tracked (when filtering)
+		if isFiltered && !whiteIsTracked && !blackIsTracked {
+			continue
+		}
+
+		// When filtering, we track stats separately for white and black
+		// For non-filtered (all games), both flags are true
+
+		// Update game counts
+		// If both players are tracked, count the game twice (once for each)
+		// If only one is tracked, count it once
+		if whiteIsTracked {
+			stats.Games++
+			stats.WhiteGames++
+		}
+		if blackIsTracked && (!whiteIsTracked || isFiltered) {
+			// Don't double-count games in non-filtered mode
+			if !whiteIsTracked {
+				stats.Games++
+			}
+			stats.BlackGames++
+		}
+
+		// Update win/loss/draw counts based on result and player color
+		switch result {
+		case "1-0": // White win
+			if whiteIsTracked {
+				stats.Wins++
+				stats.WhiteWins++
+			}
+			if blackIsTracked && !whiteIsTracked {
+				stats.Losses++
+			}
+		case "0-1": // Black win
+			if blackIsTracked {
+				stats.Wins++
+				stats.BlackWins++
+			}
+			if whiteIsTracked && !blackIsTracked {
+				stats.Losses++
+			}
+		case "1/2-1/2": // Draw
+			if whiteIsTracked {
+				stats.Draws++
+			}
+			if blackIsTracked && !whiteIsTracked {
+				stats.Draws++
+			}
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	// Calculate win rates and convert to slice
+	results := make([]OpeningStats, 0, len(openingStats))
+	for _, stats := range openingStats {
+		// Calculate overall win rate
+		if stats.Games > 0 {
+			stats.WinRate = float64(stats.Wins) / float64(stats.Games) * 100.0
+		}
+
+		// Calculate win rate as white
+		if stats.WhiteGames > 0 {
+			stats.WhiteWinRate = float64(stats.WhiteWins) / float64(stats.WhiteGames) * 100.0
+		}
+
+		// Calculate win rate as black
+		if stats.BlackGames > 0 {
+			stats.BlackWinRate = float64(stats.BlackWins) / float64(stats.BlackGames) * 100.0
+		}
+
+		results = append(results, *stats)
+	}
+
+	// Sort by number of games (most common openings first)
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Games > results[j].Games
+	})
+
+	return results, nil
+}
+
 // PositionFrequency represents a position and how often it occurs
 type PositionFrequency struct {
 	FEN            string  // The position in FEN notation
@@ -898,6 +1135,8 @@ type PositionFrequency struct {
 	WhiteWinPct    float64 // Percentage of games white won (0-100)
 	BlackWinPct    float64 // Percentage of games black won (0-100)
 	DrawPct        float64 // Percentage of games drawn (0-100)
+	ECOCode        string  // Most common ECO code for this position (if available)
+	OpeningName    string  // Most common opening name for this position (if available)
 }
 
 // GetPositionStats retrieves statistics about positions in the database
@@ -910,14 +1149,17 @@ func (db *DB) GetPositionStats(ctx context.Context) (uniqueCount int, topPositio
 		return 0, nil, fmt.Errorf("failed to get unique position count: %w", err)
 	}
 
-	// Get top 10 most common positions (after move 10) with win statistics
+	// Get top 10 most common positions (after move 10) with win statistics and ECO codes
+	// For each position, we get the most common ECO code (MODE) that appears with it
 	rows, err := db.conn.QueryContext(ctx, `
 		SELECT
 			p.fen,
 			COUNT(*) as frequency,
 			SUM(CASE WHEN g.result = '1-0' THEN 1 ELSE 0 END) as white_wins,
 			SUM(CASE WHEN g.result = '0-1' THEN 1 ELSE 0 END) as black_wins,
-			SUM(CASE WHEN g.result = '1/2-1/2' THEN 1 ELSE 0 END) as draws
+			SUM(CASE WHEN g.result = '1/2-1/2' THEN 1 ELSE 0 END) as draws,
+			p.eco_code,
+			p.opening_name
 		FROM positions p
 		JOIN games g ON p.game_id = g.id
 		WHERE p.move_number >= 20
@@ -934,8 +1176,17 @@ func (db *DB) GetPositionStats(ctx context.Context) (uniqueCount int, topPositio
 	topPositions = make([]PositionFrequency, 0, 10)
 	for rows.Next() {
 		var pos PositionFrequency
-		if err := rows.Scan(&pos.FEN, &pos.Count, &pos.WhiteWins, &pos.BlackWins, &pos.Draws); err != nil {
+		var ecoCode, openingName sql.NullString
+		if err := rows.Scan(&pos.FEN, &pos.Count, &pos.WhiteWins, &pos.BlackWins, &pos.Draws, &ecoCode, &openingName); err != nil {
 			return 0, nil, fmt.Errorf("failed to scan position row: %w", err)
+		}
+
+		// Set ECO code and opening name if available
+		if ecoCode.Valid {
+			pos.ECOCode = ecoCode.String
+		}
+		if openingName.Valid {
+			pos.OpeningName = openingName.String
 		}
 
 		// Calculate percentages
