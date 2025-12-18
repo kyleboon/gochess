@@ -65,7 +65,7 @@ func NewDatabaseWithLogger(logger *slog.Logger) (*Database, error) {
 		return len(db.openings[i].Moves) > len(db.openings[j].Moves)
 	})
 
-	logger.Info("ECO database loaded", "count", len(db.openings))
+	logger.Debug("ECO database loaded", "count", len(db.openings))
 	return db, nil
 }
 

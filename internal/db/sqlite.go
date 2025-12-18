@@ -66,7 +66,7 @@ func NewWithLogger(dbPath string, logger *slog.Logger) (*DB, error) {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
-	logger.Info("database opened successfully", "path", dbPath)
+	logger.Debug("database opened successfully", "path", dbPath)
 	return db, nil
 }
 
