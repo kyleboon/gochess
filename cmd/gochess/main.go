@@ -77,8 +77,12 @@ func main() {
 					&cli.StringFlag{
 						Name:    "format",
 						Aliases: []string{"f"},
-						Usage:   "Output format (table or csv)",
+						Usage:   "Output format (table, csv, or tui)",
 						Value:   "table",
+					},
+					&cli.BoolFlag{
+						Name:  "tui",
+						Usage: "Use pretty TUI output (same as --format=tui)",
 					},
 				},
 				Action: statsCommand,
@@ -409,8 +413,12 @@ func main() {
 								Usage: "Result offset (for pagination)",
 								Value: 0,
 							},
+							&cli.BoolFlag{
+								Name:  "tui",
+								Usage: "Use interactive TUI browser",
+							},
 						},
-						Action: db.ListCommand,
+						Action: listCommandRouter,
 					},
 					{
 						Name:  "show",
@@ -524,6 +532,17 @@ func statsCommand(c *cli.Context) error {
 	playerFilter := c.StringSlice("player")
 	showAll := c.Bool("all")
 	format := c.String("format")
+	useTUI := c.Bool("tui")
+
+	// If --tui flag is set, use TUI format
+	if useTUI {
+		format = "tui"
+	}
+
+	// Route to TUI if requested
+	if format == "tui" {
+		return statsTUICommand(c)
+	}
 
 	// Load config to get configured users
 	cfg, err := config.LoadOrDefault()
@@ -809,4 +828,12 @@ func safeDiv(a, b float64) float64 {
 		return 0
 	}
 	return a / b
+}
+
+// listCommandRouter routes to either TUI or normal list command
+func listCommandRouter(c *cli.Context) error {
+	if c.Bool("tui") {
+		return gameListTUICommand(c)
+	}
+	return db.ListCommand(c)
 }
