@@ -303,6 +303,41 @@ func TestSaveDefault(t *testing.T) {
 	assert.Equal(t, "savetest", loaded.ChessCom.Username)
 }
 
+func TestConfig_EngineRoundTrip(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "gochess-config-test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := &Config{
+		DatabasePath: "/path/to/games.db",
+		Engine: &EngineConfig{
+			Path:    "/usr/local/bin/stockfish",
+			Threads: 4,
+			Hash:    256,
+		},
+		LastImport: map[string]time.Time{},
+	}
+
+	err = cfg.Save(configPath)
+	require.NoError(t, err)
+
+	loaded, err := Load(configPath)
+	require.NoError(t, err)
+
+	require.NotNil(t, loaded.Engine)
+	assert.Equal(t, "/usr/local/bin/stockfish", loaded.Engine.Path)
+	assert.Equal(t, 4, loaded.Engine.Threads)
+	assert.Equal(t, 256, loaded.Engine.Hash)
+	assert.Equal(t, "/usr/local/bin/stockfish", loaded.GetEnginePath())
+}
+
+func TestConfig_GetEnginePath_Nil(t *testing.T) {
+	cfg := &Config{}
+	assert.Equal(t, "", cfg.GetEnginePath())
+}
+
 func TestClearAllLastImports(t *testing.T) {
 	cfg := &Config{
 		LastImport: map[string]time.Time{

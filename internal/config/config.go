@@ -10,12 +10,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// EngineConfig holds chess engine configuration
+type EngineConfig struct {
+	Path    string `yaml:"path"`
+	Threads int    `yaml:"threads,omitempty"`
+	Hash    int    `yaml:"hash,omitempty"`
+}
+
 // Config represents the gochess configuration
 type Config struct {
 	DatabasePath string                   `yaml:"database_path"`
 	LogLevel     string                   `yaml:"log_level,omitempty"`
 	ChessCom     *ChessComConfig          `yaml:"chesscom,omitempty"`
 	Lichess      *LichessConfig           `yaml:"lichess,omitempty"`
+	Engine       *EngineConfig            `yaml:"engine,omitempty"`
 	LastImport   map[string]time.Time     `yaml:"last_import,omitempty"`
 }
 
@@ -159,4 +167,12 @@ func (c *Config) GetLogLevel() string {
 		return "error"
 	}
 	return c.LogLevel
+}
+
+// GetEnginePath returns the configured engine path, or empty string if not set.
+func (c *Config) GetEnginePath() string {
+	if c.Engine != nil {
+		return c.Engine.Path
+	}
+	return ""
 }

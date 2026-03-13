@@ -15,13 +15,9 @@ import (
 )
 
 const (
-	defaultDepth       = 18
-	defaultTimePerMove = 3
-	defaultThreads     = 1
-	defaultInaccuracy  = 20
-	defaultMistake     = 50
-	defaultBlunder     = 100
-	defaultLogLevel    = "info"
+	defaultDepth    = 18
+	defaultLines    = 1
+	defaultLogLevel = "info"
 )
 
 func main() {
@@ -279,7 +275,7 @@ func main() {
 						Flags: []cli.Flag{
 							&cli.StringFlag{
 								Name:     "platform",
-								Aliases:  []string{"p"},
+								Aliases: []string{"p"},
 								Usage:    "Platform (chesscom or lichess)",
 								Required: true,
 							},
@@ -290,59 +286,49 @@ func main() {
 			},
 			{
 				Name:  "analyze",
-				Usage: "Analyze a PGN file with a chess engine",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "pgn",
-						Aliases:  []string{"p"},
-						Usage:    "Path to PGN file (required)",
-						Required: true,
-					},
-					&cli.StringFlag{
-						Name:    "engine",
-						Aliases: []string{"e"},
-						Usage:   "Path to UCI chess engine executable (optional, default: search in PATH)",
-					},
-					&cli.IntFlag{
-						Name:    "depth",
-						Aliases: []string{"d"},
-						Usage:   "Minimum analysis depth",
-						Value:   defaultDepth,
-					},
-					&cli.IntFlag{
-						Name:    "time",
-						Aliases: []string{"t"},
-						Usage:   "Maximum time per move in seconds",
-						Value:   defaultTimePerMove,
-					},
-					&cli.IntFlag{
-						Name:  "threads",
-						Usage: "Number of CPU threads",
-						Value: defaultThreads,
-					},
-					&cli.IntFlag{
-						Name:  "inaccuracy",
-						Usage: "Centipawn threshold for inaccuracies",
-						Value: defaultInaccuracy,
-					},
-					&cli.IntFlag{
-						Name:  "mistake",
-						Usage: "Centipawn threshold for mistakes",
-						Value: defaultMistake,
-					},
-					&cli.IntFlag{
-						Name:  "blunder",
-						Usage: "Centipawn threshold for blunders",
-						Value: defaultBlunder,
-					},
-					&cli.StringFlag{
-						Name:    "log",
-						Aliases: []string{"l"},
-						Usage:   "Log level (info, debug, trace)",
-						Value:   defaultLogLevel,
+				Usage: "Analyze chess positions with a UCI engine",
+				Subcommands: []*cli.Command{
+					{
+						Name:  "position",
+						Usage: "Analyze a single position",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "fen",
+								Usage: "FEN string of the position to analyze",
+							},
+							&cli.IntFlag{
+								Name:  "game-id",
+								Usage: "Game ID to load position from database",
+							},
+							&cli.IntFlag{
+								Name:  "move",
+								Usage: "Ply (half-move) number within the game (used with --game-id)",
+								Value: 0,
+							},
+							&cli.StringFlag{
+								Name:    "engine",
+								Aliases: []string{"e"},
+								Usage:   "Path to UCI chess engine executable",
+							},
+							&cli.IntFlag{
+								Name:    "depth",
+								Aliases: []string{"d"},
+								Usage:   "Analysis depth",
+								Value:   defaultDepth,
+							},
+							&cli.IntFlag{
+								Name:  "lines",
+								Usage: "Number of principal variations (MultiPV)",
+								Value: defaultLines,
+							},
+							&cli.BoolFlag{
+								Name:  "save",
+								Usage: "Save the evaluation to the database (requires --game-id)",
+							},
+						},
+						Action: analyzePositionAction,
 					},
 				},
-				Action: analyzeAction,
 			},
 			{
 				Name:  "db",
@@ -493,38 +479,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func analyzeAction(c *cli.Context) error {
-	pgnPath := c.String("pgn")
-	enginePath := c.String("engine")
-	depth := c.Int("depth")
-	timePerMove := c.Int("time")
-	threads := c.Int("threads")
-	inaccuracy := c.Int("inaccuracy")
-	mistake := c.Int("mistake")
-	blunder := c.Int("blunder")
-	logLevel := c.String("log")
-
-	log.SetPrefix("[gochess] ")
-
-	// TODO: Implement the analysis pipeline:
-	// 1. Parse PGN file
-	// 2. Initialize engine
-	// 3. Process games
-	// 4. Output annotated PGN
-
-	fmt.Printf("Analyzing PGN file: %s\n", pgnPath)
-	fmt.Printf("Using engine: %s\n", enginePath)
-	fmt.Printf("Settings: depth=%d, time=%ds, threads=%d, log=%s\n",
-		depth, timePerMove, threads, logLevel)
-	fmt.Printf("Thresholds: inaccuracy=%d, mistake=%d, blunder=%d\n",
-		inaccuracy, mistake, blunder)
-
-	// Just for demonstration
-	fmt.Println("\n=== Running Example ===")
-
-	return nil
 }
 
 func statsCommand(c *cli.Context) error {

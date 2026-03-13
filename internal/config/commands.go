@@ -89,6 +89,21 @@ func InitCommand(c *cli.Context) error {
 		}
 	}
 
+	// Ask about engine
+	fmt.Print("\nDo you want to configure a UCI chess engine (e.g., Stockfish)? (y/N): ")
+	response, _ = reader.ReadString('\n')
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response == "y" || response == "yes" {
+		fmt.Print("Enter the path to the engine executable: ")
+		enginePath, _ := reader.ReadString('\n')
+		enginePath = strings.TrimSpace(enginePath)
+		if enginePath != "" {
+			cfg.Engine = &EngineConfig{
+				Path: enginePath,
+			}
+		}
+	}
+
 	// Validate that at least one source is configured
 	if !cfg.HasAnySource() {
 		fmt.Println("\nWarning: No game sources configured. You can add them later with 'gochess config add-user'.")
@@ -142,6 +157,17 @@ func ShowCommand(c *cli.Context) error {
 			fmt.Printf("  Last import: %s\n", lastImport.Format("2006-01-02 15:04:05"))
 		} else {
 			fmt.Printf("  Last import: never\n")
+		}
+	}
+
+	if cfg.Engine != nil && cfg.Engine.Path != "" {
+		fmt.Println("\nEngine:")
+		fmt.Printf("  Path: %s\n", cfg.Engine.Path)
+		if cfg.Engine.Threads > 0 {
+			fmt.Printf("  Threads: %d\n", cfg.Engine.Threads)
+		}
+		if cfg.Engine.Hash > 0 {
+			fmt.Printf("  Hash: %d MB\n", cfg.Engine.Hash)
 		}
 	}
 

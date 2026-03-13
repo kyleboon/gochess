@@ -1207,3 +1207,111 @@ func (db *DB) GetPositionStats(ctx context.Context) (uniqueCount int, topPositio
 	db.logger.Debug("position stats retrieved", "uniqueCount", uniqueCount, "topPositionsCount", len(topPositions))
 	return uniqueCount, topPositions, nil
 }
+
+// GamePosition represents a position within a game, with game metadata.
+type GamePosition struct {
+	PositionID int
+	GameID     int
+	MoveNumber int
+	FEN        string
+	NextMove   string
+	Evaluation *float64
+	White      string
+	Black      string
+	Event      string
+	Date       string
+}
+
+// GetPositionByGameAndMove retrieves a single position for a game at a specific ply.
+func (db *DB) GetPositionByGameAndMove(ctx context.Context, gameID, moveNumber int) (*GamePosition, error) {
+	row := db.conn.QueryRowContext(ctx, `
+		SELECT p.id, p.game_id, p.move_number, p.fen, p.next_move, p.evaluation,
+		       g.white, g.black, g.event, g.date
+		FROM positions p
+		JOIN games g ON p.game_id = g.id
+		WHERE p.game_id = ? AND p.move_number = ?
+	`, gameID, moveNumber)
+
+	var gp GamePosition
+	var nextMove sql.NullString
+	var evaluation sql.NullFloat64
+	err := row.Scan(
+		&gp.PositionID, &gp.GameID, &gp.MoveNumber, &gp.FEN,
+		&nextMove, &evaluation,
+		&gp.White, &gp.Black, &gp.Event, &gp.Date,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("position not found: game %d, move %d", gameID, moveNumber)
+		}
+		return nil, fmt.Errorf("failed to get position: %w", err)
+	}
+	if nextMove.Valid {
+		gp.NextMove = nextMove.String
+	}
+	if evaluation.Valid {
+		v := evaluation.Float64
+		gp.Evaluation = &v
+	}
+	return &gp, nil
+}
+
+// GetPositionsForGame retrieves all positions for a game, ordered by move number.
+func (db *DB) GetPositionsForGame(ctx context.Context, gameID int) ([]GamePosition, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT p.id, p.game_id, p.move_number, p.fen, p.next_move, p.evaluation,
+		       g.white, g.black, g.event, g.date
+		FROM positions p
+		JOIN games g ON p.game_id = g.id
+		WHERE p.game_id = ?
+		ORDER BY p.move_number
+	`, gameID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query positions: %w", err)
+	}
+	defer rows.Close()
+
+	var positions []GamePosition
+	for rows.Next() {
+		var gp GamePosition
+		var nextMove sql.NullString
+		var evaluation sql.NullFloat64
+		if err := rows.Scan(
+			&gp.PositionID, &gp.GameID, &gp.MoveNumber, &gp.FEN,
+			&nextMove, &evaluation,
+			&gp.White, &gp.Black, &gp.Event, &gp.Date,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan position: %w", err)
+		}
+		if nextMove.Valid {
+			gp.NextMove = nextMove.String
+		}
+		if evaluation.Valid {
+			v := evaluation.Float64
+			gp.Evaluation = &v
+		}
+		positions = append(positions, gp)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating positions: %w", err)
+	}
+	return positions, nil
+}
+
+// UpdatePositionEvaluation updates the evaluation column for a position.
+func (db *DB) UpdatePositionEvaluation(ctx context.Context, positionID int, evaluation float64) error {
+	result, err := db.conn.ExecContext(ctx, `
+		UPDATE positions SET evaluation = ? WHERE id = ?
+	`, evaluation, positionID)
+	if err != nil {
+		return fmt.Errorf("failed to update evaluation: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("position not found: %d", positionID)
+	}
+	return nil
+}
