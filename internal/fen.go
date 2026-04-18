@@ -90,11 +90,12 @@ func parsePiecePlacement(board *Board, placement string) error {
 }
 
 func parseActiveColor(board *Board, color string) error {
-	if color == "w" {
+	switch color {
+	case "w":
 		board.SideToMove = White
-	} else if color == "b" {
+	case "b":
 		board.SideToMove = Black
-	} else {
+	default:
 		return errors.New("invalid active color in FEN: expected 'w' or 'b'")
 	}
 	return nil

@@ -111,15 +111,15 @@ func (m ImportProgressModel) renderProgress() string {
 	b.WriteString("\n\n")
 
 	// Spinner and current message
-	b.WriteString(fmt.Sprintf("%s %s\n", m.spinner.View(), m.progress.CurrentMsg))
+	fmt.Fprintf(&b, "%s %s\n", m.spinner.View(), m.progress.CurrentMsg)
 	b.WriteString("\n")
 
 	// Progress bar
 	if m.progress.Total > 0 {
 		pct := float64(m.progress.Current) / float64(m.progress.Total) * 100
 		bar := renderProgressBar(m.progress.Current, m.progress.Total, 50)
-		b.WriteString(fmt.Sprintf("%s %.1f%% (%d/%d)\n",
-			bar, pct, m.progress.Current, m.progress.Total))
+		fmt.Fprintf(&b, "%s %.1f%% (%d/%d)\n",
+			bar, pct, m.progress.Current, m.progress.Total)
 	}
 
 	// Errors (if any)
@@ -129,10 +129,10 @@ func (m ImportProgressModel) renderProgress() string {
 		b.WriteString("\n")
 		for i, err := range m.progress.Errors {
 			if i >= 5 {
-				b.WriteString(fmt.Sprintf("  ... and %d more\n", len(m.progress.Errors)-5))
+				fmt.Fprintf(&b, "  ... and %d more\n", len(m.progress.Errors)-5)
 				break
 			}
-			b.WriteString(fmt.Sprintf("  - %s\n", err))
+			fmt.Fprintf(&b, "  - %s\n", err)
 		}
 	}
 
@@ -165,10 +165,10 @@ func (m ImportProgressModel) renderComplete() string {
 		b.WriteString("Errors:\n")
 		for i, err := range m.progress.Errors {
 			if i >= 10 {
-				b.WriteString(fmt.Sprintf("... and %d more\n", len(m.progress.Errors)-10))
+				fmt.Fprintf(&b, "... and %d more\n", len(m.progress.Errors)-10)
 				break
 			}
-			b.WriteString(fmt.Sprintf("  - %s\n", err))
+			fmt.Fprintf(&b, "  - %s\n", err)
 		}
 	}
 
@@ -199,12 +199,12 @@ func RenderSimpleProgress(current, total int, message string) string {
 	var b strings.Builder
 
 	spinner := SpinnerStyle.Render("⣾")
-	b.WriteString(fmt.Sprintf("%s %s\n", spinner, message))
+	fmt.Fprintf(&b, "%s %s\n", spinner, message)
 
 	if total > 0 {
 		pct := float64(current) / float64(total) * 100
 		bar := renderProgressBar(current, total, 40)
-		b.WriteString(fmt.Sprintf("%s %.1f%% (%d/%d)\n", bar, pct, current, total))
+		fmt.Fprintf(&b, "%s %.1f%% (%d/%d)\n", bar, pct, current, total)
 	}
 
 	return b.String()

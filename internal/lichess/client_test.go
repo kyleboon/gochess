@@ -66,7 +66,7 @@ func TestClient_RetryOn429(t *testing.T) {
 				// Success response
 				w.Header().Set("Content-Type", "application/x-chess-pgn")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("[Event \"Test Game\"]\n\n"))
+				_, _ = w.Write([]byte("[Event \"Test Game\"]\n\n"))
 			}))
 			defer server.Close()
 
@@ -103,7 +103,7 @@ func TestClient_RetryOn429(t *testing.T) {
 				if resp == nil {
 					t.Error("expected response, got nil")
 				} else {
-					resp.Body.Close()
+					_ = resp.Body.Close()
 					if resp.StatusCode != http.StatusOK {
 						t.Errorf("expected status 200, got %d", resp.StatusCode)
 					}
@@ -291,7 +291,7 @@ func TestGetPlayerGamesPGN(t *testing.T) {
 
 				w.Header().Set("Content-Type", "application/x-chess-pgn")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(tt.serverPGN))
+				_, _ = w.Write([]byte(tt.serverPGN))
 			}))
 			defer server.Close()
 
@@ -317,7 +317,7 @@ func TestGetPlayerGamesPGN(t *testing.T) {
 			if err != nil {
 				t.Fatalf("request failed: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Read response
 			body, readErr := io.ReadAll(resp.Body)
@@ -510,7 +510,7 @@ func TestClient_GetPlayerGamesPGN(t *testing.T) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(expectedPGN))
+			_, _ = w.Write([]byte(expectedPGN))
 		}))
 		defer server.Close()
 
@@ -545,7 +545,7 @@ func TestClient_GetPlayerGamesPGN(t *testing.T) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
+			_, _ = w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
 		}))
 		defer server.Close()
 
@@ -574,7 +574,7 @@ func TestClient_GetPlayerGamesPGN(t *testing.T) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
+			_, _ = w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
 		}))
 		defer server.Close()
 
@@ -612,7 +612,7 @@ func TestClient_GetPlayerGamesPGN(t *testing.T) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
+			_, _ = w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
 		}))
 		defer server.Close()
 
@@ -640,7 +640,7 @@ func TestClient_GetPlayerGamesPGN(t *testing.T) {
 	t.Run("Empty PGN response", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(""))
+			_, _ = w.Write([]byte(""))
 		}))
 		defer server.Close()
 
@@ -689,7 +689,7 @@ func TestClient_GetPlayerGamesPGN(t *testing.T) {
 			}
 			// Second request succeeds
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
+			_, _ = w.Write([]byte("[Event \"Test\"]\n1. e4 e5 1-0\n"))
 		}))
 		defer server.Close()
 

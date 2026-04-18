@@ -59,7 +59,7 @@ func analyzePositionAction(c *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to open database: %w", err)
 		}
-		defer database.Close()
+		defer func() { _ = database.Close() }()
 
 		gamePos, err = database.GetPositionByGameAndMove(c.Context, gameID, moveNumber)
 		if err != nil {
@@ -82,7 +82,7 @@ func analyzePositionAction(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to start engine: %w", err)
 	}
-	defer eng.Close()
+	defer func() { _ = eng.Close() }()
 
 	// Run analysis
 	result, err := eng.Analyze(c.Context, fen, engine.AnalysisOptions{
@@ -98,9 +98,9 @@ func analyzePositionAction(c *cli.Context) error {
 	for _, line := range result.Lines {
 		moves := ""
 		if len(line.Moves) > 5 {
-			moves = fmt.Sprintf("%s", joinMoves(line.Moves[:5]))
+			moves = joinMoves(line.Moves[:5])
 		} else {
-			moves = fmt.Sprintf("%s", joinMoves(line.Moves))
+			moves = joinMoves(line.Moves)
 		}
 		fmt.Printf("  %d. %-8s %s\n", line.Rank, line.Score.String(), moves)
 	}
@@ -112,7 +112,7 @@ func analyzePositionAction(c *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to open database for saving: %w", err)
 		}
-		defer database.Close()
+		defer func() { _ = database.Close() }()
 
 		score := result.Lines[0].Score
 		var eval float64

@@ -18,7 +18,7 @@ func TestImportPGN_WithECOClassification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create a test PGN file with a known opening (Italian Game)
 	pgnContent := `[Event "Test Game"]
@@ -100,7 +100,7 @@ func TestImportPGN_MultipleDifferentOpenings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create a test PGN file with multiple games with different openings
 	pgnContent := `[Event "Game 1"]
@@ -158,7 +158,7 @@ func TestImportPGN_MultipleDifferentOpenings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to query games: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	games := make(map[string]struct {
 		eco     string

@@ -18,7 +18,7 @@ func TestGetOpeningStats(t *testing.T) {
 
 	db, err := NewWithLogger(dbPath, logging.Discard())
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 
@@ -149,7 +149,7 @@ func TestGetOpeningStats_WinRates(t *testing.T) {
 
 	db, err := NewWithLogger(dbPath, logging.Discard())
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 
@@ -223,7 +223,7 @@ func TestGetOpeningStats_ColorBreakdown(t *testing.T) {
 
 	db, err := NewWithLogger(dbPath, logging.Discard())
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 

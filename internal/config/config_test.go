@@ -14,7 +14,7 @@ func TestConfig_SaveAndLoad(t *testing.T) {
 	// Create temporary directory for test
 	tmpDir, err := os.MkdirTemp("", "gochess-config-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -217,12 +217,10 @@ func TestLoadOrDefault(t *testing.T) {
 		// Create temporary directory with config
 		tmpDir, err := os.MkdirTemp("", "gochess-config-test")
 		require.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		// Set HOME to temp directory so DefaultConfigPath uses it
-		oldHome := os.Getenv("HOME")
-		os.Setenv("HOME", tmpDir)
-		defer os.Setenv("HOME", oldHome)
+		t.Setenv("HOME", tmpDir)
 
 		// Create .gochess directory
 		gochessDir := filepath.Join(tmpDir, ".gochess")
@@ -251,12 +249,10 @@ func TestLoadOrDefault(t *testing.T) {
 		// Create temporary directory without config
 		tmpDir, err := os.MkdirTemp("", "gochess-config-test")
 		require.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		// Set HOME to temp directory
-		oldHome := os.Getenv("HOME")
-		os.Setenv("HOME", tmpDir)
-		defer os.Setenv("HOME", oldHome)
+		t.Setenv("HOME", tmpDir)
 
 		// Load using LoadOrDefault (should return defaults)
 		loaded, err := LoadOrDefault()
@@ -272,12 +268,10 @@ func TestSaveDefault(t *testing.T) {
 	// Create temporary directory
 	tmpDir, err := os.MkdirTemp("", "gochess-config-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Set HOME to temp directory
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tmpDir)
 
 	// Create config
 	cfg := &Config{
@@ -306,7 +300,7 @@ func TestSaveDefault(t *testing.T) {
 func TestConfig_EngineRoundTrip(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "gochess-config-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 

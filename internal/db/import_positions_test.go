@@ -15,12 +15,12 @@ func TestImportPGN_WithPositions(t *testing.T) {
 	// Create a temporary database
 	tempDir, err := os.MkdirTemp("", "gochess-test-positions-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	dbPath := tempDir + "/test.db"
 	db, err := NewWithLogger(dbPath, logging.Discard())
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create a test PGN file
 	pgnContent := `[Event "Test Game"]
@@ -80,12 +80,12 @@ func TestImportPGN_PositionsForMultipleGames(t *testing.T) {
 	// Create a temporary database
 	tempDir, err := os.MkdirTemp("", "gochess-test-multi-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	dbPath := tempDir + "/test.db"
 	db, err := NewWithLogger(dbPath, logging.Discard())
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create a test PGN file with 2 games
 	pgnContent := `[Event "Game 1"]
@@ -135,7 +135,7 @@ func TestImportPGN_PositionsForMultipleGames(t *testing.T) {
 		ORDER BY game_id
 	`)
 	require.NoError(t, err)
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	gameCounts := make(map[int]int)
 	for rows.Next() {
@@ -155,12 +155,12 @@ func TestImportPGN_SkipDuplicatePositions(t *testing.T) {
 	// Create a temporary database
 	tempDir, err := os.MkdirTemp("", "gochess-test-dup-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	dbPath := tempDir + "/test.db"
 	db, err := NewWithLogger(dbPath, logging.Discard())
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create a test PGN file
 	pgnContent := `[Event "Test Game"]

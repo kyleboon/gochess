@@ -14,7 +14,7 @@ func GamesToDatabase(games *GamesResponse) (*pgn.DB, []error) {
 
 	for _, game := range games.Games {
 		pgnData := game.PGN
-		if err := db.Parse(pgnData); err != nil && len(err) > 0 {
+		if err := db.Parse(pgnData); len(err) > 0 {
 			errs = append(errs, fmt.Errorf("failed to parse game PGN: %v", err))
 		}
 	}

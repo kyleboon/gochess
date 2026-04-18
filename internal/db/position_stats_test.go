@@ -15,12 +15,12 @@ func TestGetPositionStats(t *testing.T) {
 	// Create a temporary database
 	tempDir, err := os.MkdirTemp("", "gochess-test-position-stats-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	dbPath := tempDir + "/test.db"
 	db, err := NewWithLogger(dbPath, logging.Discard())
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 
@@ -116,12 +116,12 @@ func TestGetPositionStats_LargeDataset(t *testing.T) {
 	// Create a temporary database
 	tempDir, err := os.MkdirTemp("", "gochess-test-large-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	dbPath := tempDir + "/test.db"
 	db, err := NewWithLogger(dbPath, logging.Discard())
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 

@@ -99,9 +99,9 @@ func TestNewWithLevel(t *testing.T) {
 		{
 			name:  "Debug level logs debug messages",
 			level: LevelDebug,
-			logFunc: func(l *slog.Logger) {
+			logFunc: func(_ *slog.Logger) {
 				// Replace the handler to use our buffer
-				l = slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+				l := slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 				l.Debug("debug message")
 			},
 			shouldAppear: true,
@@ -109,8 +109,8 @@ func TestNewWithLevel(t *testing.T) {
 		{
 			name:  "Info level filters debug messages",
 			level: LevelInfo,
-			logFunc: func(l *slog.Logger) {
-				l = slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+			logFunc: func(_ *slog.Logger) {
+				l := slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 				l.Debug("debug message")
 			},
 			shouldAppear: false,
@@ -118,8 +118,8 @@ func TestNewWithLevel(t *testing.T) {
 		{
 			name:  "Error level filters info messages",
 			level: LevelError,
-			logFunc: func(l *slog.Logger) {
-				l = slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelError}))
+			logFunc: func(_ *slog.Logger) {
+				l := slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelError}))
 				l.Info("info message")
 			},
 			shouldAppear: false,

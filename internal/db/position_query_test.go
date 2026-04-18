@@ -43,8 +43,8 @@ func setupTestDBWithGame(t *testing.T) (*DB, string) {
 
 func TestGetPositionByGameAndMove(t *testing.T) {
 	database, tempDir := setupTestDBWithGame(t)
-	defer os.RemoveAll(tempDir)
-	defer database.Close()
+	defer func() { _ = os.RemoveAll(tempDir) }()
+	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
 
@@ -77,8 +77,8 @@ func TestGetPositionByGameAndMove(t *testing.T) {
 
 func TestGetPositionsForGame(t *testing.T) {
 	database, tempDir := setupTestDBWithGame(t)
-	defer os.RemoveAll(tempDir)
-	defer database.Close()
+	defer func() { _ = os.RemoveAll(tempDir) }()
+	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
 
@@ -111,8 +111,8 @@ func TestGetPositionsForGame(t *testing.T) {
 
 func TestUpdatePositionEvaluation(t *testing.T) {
 	database, tempDir := setupTestDBWithGame(t)
-	defer os.RemoveAll(tempDir)
-	defer database.Close()
+	defer func() { _ = os.RemoveAll(tempDir) }()
+	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
 

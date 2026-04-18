@@ -62,7 +62,7 @@ func TestClient_RetryOn429(t *testing.T) {
 				}
 				// Success response
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"archives":[]}`))
+				_, _ = w.Write([]byte(`{"archives":[]}`))
 			}))
 			defer server.Close()
 
@@ -101,7 +101,7 @@ func TestClient_RetryOn429(t *testing.T) {
 				if resp == nil {
 					t.Error("expected response, got nil")
 				} else {
-					resp.Body.Close()
+					_ = resp.Body.Close()
 					if resp.StatusCode != http.StatusOK {
 						t.Errorf("expected status 200, got %d", resp.StatusCode)
 					}
@@ -230,7 +230,7 @@ func TestClient_GetPlayerGames(t *testing.T) {
 
 			// Return sample JSON response
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{
+			_, _ = w.Write([]byte(`{
 				"games": [
 					{
 						"url": "https://www.chess.com/game/live/123",
@@ -287,7 +287,7 @@ func TestClient_GetPlayerGamesPGN(t *testing.T) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(expectedPGN))
+			_, _ = w.Write([]byte(expectedPGN))
 		}))
 		defer server.Close()
 
@@ -328,7 +328,7 @@ func TestClient_GetArchivedMonths(t *testing.T) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{
+			_, _ = w.Write([]byte(`{
 				"archives": [
 					"https://api.chess.com/pub/player/testuser/games/2024/01",
 					"https://api.chess.com/pub/player/testuser/games/2024/02"

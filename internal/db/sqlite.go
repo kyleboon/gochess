@@ -49,7 +49,7 @@ func NewWithLogger(dbPath string, logger *slog.Logger) (*DB, error) {
 	// Initialize ECO database
 	ecoDB, err := eco.NewDatabaseWithLogger(logger)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		logger.Error("failed to initialize ECO database", "error", err)
 		return nil, fmt.Errorf("failed to initialize ECO database: %w", err)
 	}
@@ -61,7 +61,7 @@ func NewWithLogger(dbPath string, logger *slog.Logger) (*DB, error) {
 	}
 
 	if err := db.createTables(); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		logger.Error("failed to create database tables", "error", err)
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
@@ -271,15 +271,17 @@ func validateGameTags(game *pgn.Game) error {
 func checkDuplicateGame(tx *sql.Tx, gameHash string) (bool, error) {
 	var existingID int
 	err := tx.QueryRow("SELECT id FROM games WHERE game_hash = ?", gameHash).Scan(&existingID)
-	if err == nil {
+	switch err {
+	case nil:
 		// Game exists
 		return true, nil
-	} else if err == sql.ErrNoRows {
+	case sql.ErrNoRows:
 		// Game doesn't exist
 		return false, nil
+	default:
+		// Unexpected error
+		return false, err
 	}
-	// Unexpected error
-	return false, err
 }
 
 // insertGameRecord inserts a game and its tags into the database and returns the game ID
@@ -365,7 +367,7 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 	db.logger.Debug("transaction started")
 	defer func() {
 		if err := recover(); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			panic(err)
 		}
 	}()
@@ -378,33 +380,33 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		allErrors = append(allErrors, &PGNImportError{OriginalError: fmt.Errorf("failed to prepare game statement: %w", err), PGNText: ""})
 		return 0, allErrors
 	}
-	defer stmtGame.Close()
+	defer func() { _ = stmtGame.Close() }()
 
 	stmtTag, err := tx.PrepareContext(ctx, `
 		INSERT INTO tags (game_id, tag_name, tag_value)
 		VALUES (?, ?, ?)
 	`)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		allErrors = append(allErrors, &PGNImportError{OriginalError: fmt.Errorf("failed to prepare tag statement: %w", err), PGNText: ""})
 		return 0, allErrors
 	}
-	defer stmtTag.Close()
+	defer func() { _ = stmtTag.Close() }()
 
 	stmtPosition, err := tx.PrepareContext(ctx, `
 		INSERT INTO positions (game_id, move_number, fen, next_move, evaluation, eco_code, opening_name)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		allErrors = append(allErrors, &PGNImportError{OriginalError: fmt.Errorf("failed to prepare position statement: %w", err), PGNText: ""})
 		return 0, allErrors
 	}
-	defer stmtPosition.Close()
+	defer func() { _ = stmtPosition.Close() }()
 
 	// Count of successfully imported games
 	importedCount := 0
@@ -498,7 +500,7 @@ func (db *DB) ImportPGN(ctx context.Context, filePath string) (int, []error) {
 	err = tx.Commit()
 	if err != nil {
 		db.logger.Error("failed to commit transaction", "error", err, "importedGames", importedCount)
-		tx.Rollback()
+		_ = tx.Rollback()
 		allErrors = append(allErrors, &PGNImportError{OriginalError: fmt.Errorf("failed to commit transaction: %w", err), PGNText: ""})
 		return importedCount, allErrors
 	}
@@ -546,8 +548,8 @@ func (db *DB) SearchGames(ctx context.Context, criteria map[string]string, limit
 		db.logger.Error("failed to execute search query", "error", err)
 		return nil, fmt.Errorf("failed to search games: %w", err)
 	}
-	defer rows.Close()
-	
+	defer func() { _ = rows.Close() }()
+
 	// Process results
 	var games []map[string]interface{}
 	for rows.Next() {
@@ -633,8 +635,8 @@ func (db *DB) GetGameByID(ctx context.Context, id int) (map[string]interface{}, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tags: %w", err)
 	}
-	defer rows.Close()
-	
+	defer func() { _ = rows.Close() }()
+
 	tags := make(map[string]string)
 	for rows.Next() {
 		var name, value string
@@ -662,7 +664,7 @@ func (db *DB) ClearGames(ctx context.Context) error {
 	}
 	defer func() {
 		if err := recover(); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			panic(err)
 		}
 	}()
@@ -670,27 +672,27 @@ func (db *DB) ClearGames(ctx context.Context) error {
 	// Delete all child tables first (due to foreign key constraints)
 	_, err = tx.Exec("DELETE FROM tags")
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return fmt.Errorf("failed to delete tags: %w", err)
 	}
 
 	_, err = tx.Exec("DELETE FROM positions")
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return fmt.Errorf("failed to delete positions: %w", err)
 	}
 
 	// Delete all games
 	_, err = tx.Exec("DELETE FROM games")
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return fmt.Errorf("failed to delete games: %w", err)
 	}
 
 	// Reset the auto-increment counters
 	_, err = tx.Exec("DELETE FROM sqlite_sequence WHERE name='games' OR name='tags' OR name='positions'")
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return fmt.Errorf("failed to reset sequence: %w", err)
 	}
 
@@ -824,7 +826,7 @@ func (db *DB) GetPlayerStatsFiltered(ctx context.Context, players []string) ([]P
 	if err != nil {
 		return nil, fmt.Errorf("failed to query games: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Map to track player statistics
 	playerStats := make(map[string]*PlayerStats)
@@ -1008,7 +1010,7 @@ func (db *DB) GetOpeningStatsFiltered(ctx context.Context, players []string) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to query games: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Map to track opening statistics (keyed by ECO code)
 	openingStats := make(map[string]*OpeningStats)
@@ -1171,7 +1173,7 @@ func (db *DB) GetPositionStats(ctx context.Context) (uniqueCount int, topPositio
 		db.logger.Error("failed to query top positions", "error", err)
 		return 0, nil, fmt.Errorf("failed to query top positions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	topPositions = make([]PositionFrequency, 0, 10)
 	for rows.Next() {
@@ -1269,7 +1271,7 @@ func (db *DB) GetPositionsForGame(ctx context.Context, gameID int) ([]GamePositi
 	if err != nil {
 		return nil, fmt.Errorf("failed to query positions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var positions []GamePosition
 	for rows.Next() {

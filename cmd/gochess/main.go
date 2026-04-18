@@ -510,7 +510,7 @@ func statsCommand(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	// Get game count
 	count, err := database.GetGameCount(c.Context)
@@ -774,14 +774,6 @@ func repeatString(s string, n int) string {
 		result += s
 	}
 	return result
-}
-
-// safeDiv performs division but handles division by zero gracefully
-func safeDiv(a, b float64) float64 {
-	if b == 0 {
-		return 0
-	}
-	return a / b
 }
 
 // listCommandRouter routes to either TUI or normal list command

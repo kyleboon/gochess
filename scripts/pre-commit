@@ -1,0 +1,23 @@
+#!/bin/sh
+# Pre-commit hook: mirrors the CI pipeline checks
+# Runs: build, vet, golangci-lint, tests (short mode)
+#
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -e
+
+echo "=== Pre-commit checks ==="
+
+echo "-> go build ./..."
+go build ./...
+
+echo "-> go vet ./..."
+go vet ./...
+
+echo "-> golangci-lint run ./..."
+golangci-lint run ./...
+
+echo "-> go test -short -race -count=1 ./..."
+go test -short -race -count=1 ./...
+
+echo "=== All checks passed ==="

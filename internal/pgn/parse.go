@@ -98,7 +98,7 @@ func (p *parser) expect(typ itemType) item {
 
 // unescape unquotes and unescapes a backslash-escaped PGN string.
 func unescape(s string) string {
-	return strings.Replace(unquote(s), "\\", "", -1)
+	return strings.ReplaceAll(unquote(s), "\\", "")
 }
 
 // unquote removes the first and last character from s, trimming the result.

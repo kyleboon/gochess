@@ -58,31 +58,31 @@ func NewWithOptions(ctx context.Context, path string, logger *slog.Logger, opts 
 
 	// Send "uci" and wait for "uciok"
 	if err := e.send("uci"); err != nil {
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		return nil, err
 	}
 	if _, err := e.readUntil(ctx, "uciok"); err != nil {
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		return nil, fmt.Errorf("engine did not respond with uciok: %w", err)
 	}
 
 	// Set options
 	if opts.Threads > 0 {
 		if err := e.SetOption("Threads", fmt.Sprintf("%d", opts.Threads)); err != nil {
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 			return nil, err
 		}
 	}
 	if opts.Hash > 0 {
 		if err := e.SetOption("Hash", fmt.Sprintf("%d", opts.Hash)); err != nil {
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 			return nil, err
 		}
 	}
 
 	// Wait for engine to be ready
 	if err := e.IsReady(ctx); err != nil {
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		return nil, err
 	}
 
@@ -106,7 +106,7 @@ func (e *Engine) Close() error {
 	defer e.mu.Unlock()
 
 	_ = e.sendLocked("quit")
-	e.stdin.Close()
+	_ = e.stdin.Close()
 
 	if e.cmd != nil {
 		return e.cmd.Wait()

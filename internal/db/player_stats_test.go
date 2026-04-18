@@ -14,12 +14,12 @@ func TestGetPlayerStats(t *testing.T) {
 	// Create a temporary database
 	tempDir, err := os.MkdirTemp("", "gochess-test-player-stats-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	dbPath := tempDir + "/test.db"
 	db, err := NewWithLogger(dbPath, logging.Discard())
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 
@@ -214,12 +214,12 @@ func TestGetPlayerStats_Sorting(t *testing.T) {
 	// Create a temporary database
 	tempDir, err := os.MkdirTemp("", "gochess-test-sorting-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	dbPath := tempDir + "/test.db"
 	db, err := NewWithLogger(dbPath, logging.Discard())
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 

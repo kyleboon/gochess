@@ -1,7 +1,6 @@
 package db
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/kyleboon/gochess/internal"
@@ -42,9 +41,10 @@ func moveToSAN(m internal.Move, b *internal.Board) string {
 		fromFile := m.From.File()
 		toFile := m.To.File()
 		if fromFile == 4 { // King starts on e-file
-			if toFile == 6 {
+			switch toFile {
+			case 6:
 				return "O-O" // Kingside
-			} else if toFile == 2 {
+			case 2:
 				return "O-O-O" // Queenside
 			}
 		}
@@ -86,35 +86,3 @@ func moveToSAN(m internal.Move, b *internal.Board) string {
 	return san.String()
 }
 
-// extractMovesFromPGN extracts move strings from raw PGN text
-// This is an alternative approach that parses the PGN text directly
-func extractMovesFromPGN(pgnText string) []string {
-	moves := make([]string, 0, 100)
-
-	// Remove comments (anything in braces or parentheses)
-	re := regexp.MustCompile(`\{[^}]*\}|\([^)]*\)`)
-	pgnText = re.ReplaceAllString(pgnText, "")
-
-	// Remove result markers
-	pgnText = strings.ReplaceAll(pgnText, "1-0", "")
-	pgnText = strings.ReplaceAll(pgnText, "0-1", "")
-	pgnText = strings.ReplaceAll(pgnText, "1/2-1/2", "")
-	pgnText = strings.ReplaceAll(pgnText, "*", "")
-
-	// Split by whitespace
-	tokens := strings.Fields(pgnText)
-
-	// Extract moves (skip move numbers like "1.", "2.", etc.)
-	movePattern := regexp.MustCompile(`^\d+\.+$`)
-	for _, token := range tokens {
-		if !movePattern.MatchString(token) && token != "" {
-			// Remove any annotations like !?, !, ??, etc.
-			move := strings.TrimRight(token, "!?")
-			if move != "" {
-				moves = append(moves, move)
-			}
-		}
-	}
-
-	return moves
-}

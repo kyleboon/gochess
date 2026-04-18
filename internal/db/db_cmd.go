@@ -11,10 +11,6 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-const (
-	defaultDBPath = "~/.gochess/games.db"
-)
-
 // expandPath expands the tilde in file paths to the user's home directory
 func expandPath(path string) string {
 	if path == "" {
@@ -47,7 +43,7 @@ func ImportCommand(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Get start count
 	startCount, err := db.GetGameCount(c.Context)
@@ -221,8 +217,8 @@ func ListCommand(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
-	
+	defer func() { _ = db.Close() }()
+
 	// Get total count
 	count, err := db.GetGameCount(c.Context)
 	if err != nil {
@@ -266,8 +262,8 @@ func ShowCommand(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
-	
+	defer func() { _ = db.Close() }()
+
 	// Get the game
 	game, err := db.GetGameByID(c.Context, id)
 	if err != nil {
@@ -310,8 +306,8 @@ func ExportCommand(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
-	
+	defer func() { _ = db.Close() }()
+
 	// Set up output writer
 	var outputWriter *os.File
 	if output == "" {
@@ -322,7 +318,7 @@ func ExportCommand(c *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
-		defer outputWriter.Close()
+		defer func() { _ = outputWriter.Close() }()
 	}
 	
 	// Export specific game or all games
@@ -334,7 +330,7 @@ func ExportCommand(c *cli.Context) error {
 		}
 		
 		pgnText := game["pgn_text"].(string)
-		fmt.Fprintln(outputWriter, pgnText)
+		_, _ = fmt.Fprintln(outputWriter, pgnText)
 		
 		if output != "" {
 			fmt.Printf("Exported game #%d to %s\n", id, output)
@@ -357,7 +353,7 @@ func ClearCommand(c *cli.Context) error {
 		fmt.Print("Are you sure you want to continue? [y/N]: ")
 		
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		
 		if response != "y" && response != "Y" {
 			fmt.Println("Operation cancelled")
@@ -371,8 +367,8 @@ func ClearCommand(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
-	
+	defer func() { _ = db.Close() }()
+
 	// Get initial count
 	count, err := db.GetGameCount(c.Context)
 	if err != nil {

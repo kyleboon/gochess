@@ -75,14 +75,14 @@ func downloadAndImportMonthlyGames(ctx context.Context, username string, year, m
 			return 0, fmt.Errorf("failed to create temporary file: %w", err)
 		}
 		tmpPath := tmpfile.Name()
-		defer os.Remove(tmpPath) // Clean up
+		defer func() { _ = os.Remove(tmpPath) }() // Clean up
 
 		// Write PGN to temporary file
 		if _, err := tmpfile.WriteString(pgn); err != nil {
-			tmpfile.Close()
+			_ = tmpfile.Close()
 			return 0, fmt.Errorf("failed to write to temporary file: %w", err)
 		}
-		tmpfile.Close()
+		_ = tmpfile.Close()
 
 		// Use the external database if provided, otherwise open a new connection
 		var database *db.DB
@@ -100,7 +100,7 @@ func downloadAndImportMonthlyGames(ctx context.Context, username string, year, m
 			dbOpened = true
 			defer func() {
 				if dbOpened {
-					database.Close()
+					_ = database.Close()
 				}
 			}()
 		} else {
@@ -140,7 +140,7 @@ func downloadAndImportMonthlyGames(ctx context.Context, username string, year, m
 		if err != nil {
 			return 0, fmt.Errorf("failed to create output file %s: %w", monthlyOutput, err)
 		}
-		defer outputFile.Close()
+		defer func() { _ = outputFile.Close() }()
 		
 		// Write the PGN data
 		_, err = outputFile.WriteString(pgn)
@@ -190,7 +190,7 @@ func DownloadGames(c *cli.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to open database: %w", err)
 			}
-			defer database.Close()
+			defer func() { _ = database.Close() }()
 		}
 		
 		totalGames := 0
@@ -309,7 +309,7 @@ func DownloadGames(c *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
-		defer outputWriter.Close()
+		defer func() { _ = outputWriter.Close() }()
 	}
 
 	switch format {
@@ -319,7 +319,7 @@ func DownloadGames(c *cli.Context) error {
 			return fmt.Errorf("failed to fetch PGN: %w", err)
 		}
 
-		fmt.Fprintln(outputWriter, pgn)
+		_, _ = fmt.Fprintln(outputWriter, pgn)
 
 		if output != "" {
 			fmt.Printf("Downloaded PGN games for %s (%d/%02d) to %s\n",
@@ -334,15 +334,15 @@ func DownloadGames(c *cli.Context) error {
 
 		// Just output the raw JSON for now
 		for i, game := range games.Games {
-			fmt.Fprintf(outputWriter, "Game %d:\n", i+1)
-			fmt.Fprintf(outputWriter, "  URL: %s\n", game.URL)
-			fmt.Fprintf(outputWriter, "  White: %s (Rating: %d)\n", game.White.Username, game.White.Rating)
-			fmt.Fprintf(outputWriter, "  Black: %s (Rating: %d)\n", game.Black.Username, game.Black.Rating)
-			fmt.Fprintf(outputWriter, "  Result: %s-%s\n", game.White.Result, game.Black.Result)
-			fmt.Fprintf(outputWriter, "  Time Control: %s\n", game.TimeControl)
-			fmt.Fprintf(outputWriter, "  End Time: %s\n", game.GetEndTime().Format(time.RFC3339))
-			fmt.Fprintf(outputWriter, "  Rated: %v\n", game.Rated)
-			fmt.Fprintf(outputWriter, "  PGN: %s\n\n", game.PGN)
+			_, _ = fmt.Fprintf(outputWriter, "Game %d:\n", i+1)
+			_, _ = fmt.Fprintf(outputWriter, "  URL: %s\n", game.URL)
+			_, _ = fmt.Fprintf(outputWriter, "  White: %s (Rating: %d)\n", game.White.Username, game.White.Rating)
+			_, _ = fmt.Fprintf(outputWriter, "  Black: %s (Rating: %d)\n", game.Black.Username, game.Black.Rating)
+			_, _ = fmt.Fprintf(outputWriter, "  Result: %s-%s\n", game.White.Result, game.Black.Result)
+			_, _ = fmt.Fprintf(outputWriter, "  Time Control: %s\n", game.TimeControl)
+			_, _ = fmt.Fprintf(outputWriter, "  End Time: %s\n", game.GetEndTime().Format(time.RFC3339))
+			_, _ = fmt.Fprintf(outputWriter, "  Rated: %v\n", game.Rated)
+			_, _ = fmt.Fprintf(outputWriter, "  PGN: %s\n\n", game.PGN)
 		}
 
 		if output != "" {
@@ -356,15 +356,15 @@ func DownloadGames(c *cli.Context) error {
 			return fmt.Errorf("failed to fetch games: %w", err)
 		}
 
-		fmt.Fprintf(outputWriter, "Games for %s (%d/%02d):\n", username, year, month)
-		fmt.Fprintf(outputWriter, "Total games: %d\n\n", len(games.Games))
+		_, _ = fmt.Fprintf(outputWriter, "Games for %s (%d/%02d):\n", username, year, month)
+		_, _ = fmt.Fprintf(outputWriter, "Total games: %d\n\n", len(games.Games))
 
 		for i, game := range games.Games {
-			fmt.Fprintf(outputWriter, "Game %d: %s vs %s\n",
+			_, _ = fmt.Fprintf(outputWriter, "Game %d: %s vs %s\n",
 				i+1, game.White.Username, game.Black.Username)
-			fmt.Fprintf(outputWriter, "  Result: %s-%s\n", game.White.Result, game.Black.Result)
-			fmt.Fprintf(outputWriter, "  Time Control: %s\n", game.TimeControl)
-			fmt.Fprintf(outputWriter, "  Date: %s\n\n", game.GetEndTime().Format("2006-01-02"))
+			_, _ = fmt.Fprintf(outputWriter, "  Result: %s-%s\n", game.White.Result, game.Black.Result)
+			_, _ = fmt.Fprintf(outputWriter, "  Time Control: %s\n", game.TimeControl)
+			_, _ = fmt.Fprintf(outputWriter, "  Date: %s\n\n", game.GetEndTime().Format("2006-01-02"))
 		}
 
 		if output != "" {

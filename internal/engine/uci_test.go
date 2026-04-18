@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -177,21 +176,21 @@ func mockEngine(t *testing.T, responses []string) (*Engine, func()) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		defer engineStdoutW.Close()
+		defer func() { _ = engineStdoutW.Close() }()
 
-		scanner := fmt.Sprintf("%s", strings.Join(responses, "\n"))
+		scanner := strings.Join(responses, "\n")
 		_, _ = io.WriteString(engineStdoutW, scanner+"\n")
 	}()
 
 	cleanup := func() {
-		engineStdinR.Close()
-		engineStdinW.Close()
+		_ = engineStdinR.Close()
+		_ = engineStdinW.Close()
 		<-done
 	}
 
 	// Consume stdin in background to prevent blocking
 	go func() {
-		io.Copy(io.Discard, engineStdinR)
+		_, _ = io.Copy(io.Discard, engineStdinR)
 	}()
 
 	return e, cleanup
@@ -273,13 +272,13 @@ func TestMockEngine_AnalyzeContextCanceled(t *testing.T) {
 
 	// Write some info lines but never bestmove
 	go func() {
-		io.WriteString(engineStdoutW, "info depth 1 score cp 10 pv e2e4\n")
+		_, _ = io.WriteString(engineStdoutW, "info depth 1 score cp 10 pv e2e4\n")
 		// Don't write bestmove — let context cancel
 	}()
 
 	// Consume stdin
 	go func() {
-		io.Copy(io.Discard, engineStdinR)
+		_, _ = io.Copy(io.Discard, engineStdinR)
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -288,7 +287,7 @@ func TestMockEngine_AnalyzeContextCanceled(t *testing.T) {
 	_, err := e.Analyze(ctx, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", AnalysisOptions{Depth: 10})
 	assert.Error(t, err)
 
-	engineStdinR.Close()
-	engineStdinW.Close()
-	engineStdoutW.Close()
+	_ = engineStdinR.Close()
+	_ = engineStdinW.Close()
+	_ = engineStdoutW.Close()
 }

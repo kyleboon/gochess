@@ -24,14 +24,14 @@ func RenderPlayerStats(stats []db.PlayerStats, totalGames int) string {
 
 	// Table header
 	headerCols := []string{
-		HeaderStyle.Copy().Width(20).Render("PLAYER"),
-		HeaderStyle.Copy().Width(8).Align(lipgloss.Right).Render("GAMES"),
-		HeaderStyle.Copy().Width(8).Align(lipgloss.Right).Render("WINS"),
-		HeaderStyle.Copy().Width(8).Align(lipgloss.Right).Render("LOSSES"),
-		HeaderStyle.Copy().Width(8).Align(lipgloss.Right).Render("DRAWS"),
-		HeaderStyle.Copy().Width(10).Align(lipgloss.Right).Render("WIN RATE"),
-		HeaderStyle.Copy().Width(10).Align(lipgloss.Right).Render("AS WHITE"),
-		HeaderStyle.Copy().Width(10).Align(lipgloss.Right).Render("AS BLACK"),
+		HeaderStyle.Width(20).Render("PLAYER"),
+		HeaderStyle.Width(8).Align(lipgloss.Right).Render("GAMES"),
+		HeaderStyle.Width(8).Align(lipgloss.Right).Render("WINS"),
+		HeaderStyle.Width(8).Align(lipgloss.Right).Render("LOSSES"),
+		HeaderStyle.Width(8).Align(lipgloss.Right).Render("DRAWS"),
+		HeaderStyle.Width(10).Align(lipgloss.Right).Render("WIN RATE"),
+		HeaderStyle.Width(10).Align(lipgloss.Right).Render("AS WHITE"),
+		HeaderStyle.Width(10).Align(lipgloss.Right).Render("AS BLACK"),
 	}
 	header := lipgloss.JoinHorizontal(lipgloss.Top, headerCols...)
 	b.WriteString(header)
@@ -70,14 +70,14 @@ func RenderPlayerStats(stats []db.PlayerStats, totalGames int) string {
 		blackRateText := fmt.Sprintf("%.1f%%", s.BlackWinRate)
 
 		cols := []string{
-			rowStyle.Copy().Width(20).Render(name),
-			rowStyle.Copy().Width(8).Align(lipgloss.Right).Render(fmt.Sprintf("%d", s.Games)),
-			rowStyle.Copy().Width(8).Align(lipgloss.Right).Render(WinStyle.Render(fmt.Sprintf("%d", s.Wins))),
-			rowStyle.Copy().Width(8).Align(lipgloss.Right).Render(LossStyle.Render(fmt.Sprintf("%d", s.Losses))),
-			rowStyle.Copy().Width(8).Align(lipgloss.Right).Render(DrawStyle.Render(fmt.Sprintf("%d", s.Draws))),
-			rowStyle.Copy().Width(10).Align(lipgloss.Right).Render(winRateStyle.Render(winRateText)),
-			rowStyle.Copy().Width(10).Align(lipgloss.Right).Render(whiteRateText),
-			rowStyle.Copy().Width(10).Align(lipgloss.Right).Render(blackRateText),
+			rowStyle.Width(20).Render(name),
+			rowStyle.Width(8).Align(lipgloss.Right).Render(fmt.Sprintf("%d", s.Games)),
+			rowStyle.Width(8).Align(lipgloss.Right).Render(WinStyle.Render(fmt.Sprintf("%d", s.Wins))),
+			rowStyle.Width(8).Align(lipgloss.Right).Render(LossStyle.Render(fmt.Sprintf("%d", s.Losses))),
+			rowStyle.Width(8).Align(lipgloss.Right).Render(DrawStyle.Render(fmt.Sprintf("%d", s.Draws))),
+			rowStyle.Width(10).Align(lipgloss.Right).Render(winRateStyle.Render(winRateText)),
+			rowStyle.Width(10).Align(lipgloss.Right).Render(whiteRateText),
+			rowStyle.Width(10).Align(lipgloss.Right).Render(blackRateText),
 		}
 		row := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
 		b.WriteString(row)
@@ -106,16 +106,16 @@ func renderDetailedPlayerStats(s db.PlayerStats) string {
 	b.WriteString("\n")
 
 	whiteRecord := fmt.Sprintf("%d-%d-%d (W-L-D)", s.WhiteWins, s.WhiteLosses, s.WhiteDraws)
-	b.WriteString(fmt.Sprintf("  As White: %s games, %s, %s win rate\n",
+	fmt.Fprintf(&b, "  As White: %s games, %s, %s win rate\n",
 		StatValueStyle.Render(fmt.Sprintf("%d", s.WhiteGames)),
 		whiteRecord,
-		WinStyle.Render(fmt.Sprintf("%.1f%%", s.WhiteWinRate))))
+		WinStyle.Render(fmt.Sprintf("%.1f%%", s.WhiteWinRate)))
 
 	blackRecord := fmt.Sprintf("%d-%d-%d (W-L-D)", s.BlackWins, s.BlackLosses, s.BlackDraws)
-	b.WriteString(fmt.Sprintf("  As Black: %s games, %s, %s win rate\n",
+	fmt.Fprintf(&b, "  As Black: %s games, %s, %s win rate\n",
 		StatValueStyle.Render(fmt.Sprintf("%d", s.BlackGames)),
 		blackRecord,
-		WinStyle.Render(fmt.Sprintf("%.1f%%", s.BlackWinRate))))
+		WinStyle.Render(fmt.Sprintf("%.1f%%", s.BlackWinRate)))
 
 	// Time control breakdown
 	if s.BulletGames > 0 || s.BlitzGames > 0 || s.RapidGames > 0 || s.ClassicalGames > 0 {
@@ -125,23 +125,23 @@ func renderDetailedPlayerStats(s db.PlayerStats) string {
 
 		if s.BulletGames > 0 {
 			pct := float64(s.BulletGames) / float64(s.Games) * 100
-			b.WriteString(fmt.Sprintf("  Bullet:    %s games (%.1f%%)\n",
-				StatValueStyle.Render(fmt.Sprintf("%d", s.BulletGames)), pct))
+			fmt.Fprintf(&b, "  Bullet:    %s games (%.1f%%)\n",
+				StatValueStyle.Render(fmt.Sprintf("%d", s.BulletGames)), pct)
 		}
 		if s.BlitzGames > 0 {
 			pct := float64(s.BlitzGames) / float64(s.Games) * 100
-			b.WriteString(fmt.Sprintf("  Blitz:     %s games (%.1f%%)\n",
-				StatValueStyle.Render(fmt.Sprintf("%d", s.BlitzGames)), pct))
+			fmt.Fprintf(&b, "  Blitz:     %s games (%.1f%%)\n",
+				StatValueStyle.Render(fmt.Sprintf("%d", s.BlitzGames)), pct)
 		}
 		if s.RapidGames > 0 {
 			pct := float64(s.RapidGames) / float64(s.Games) * 100
-			b.WriteString(fmt.Sprintf("  Rapid:     %s games (%.1f%%)\n",
-				StatValueStyle.Render(fmt.Sprintf("%d", s.RapidGames)), pct))
+			fmt.Fprintf(&b, "  Rapid:     %s games (%.1f%%)\n",
+				StatValueStyle.Render(fmt.Sprintf("%d", s.RapidGames)), pct)
 		}
 		if s.ClassicalGames > 0 {
 			pct := float64(s.ClassicalGames) / float64(s.Games) * 100
-			b.WriteString(fmt.Sprintf("  Classical: %s games (%.1f%%)\n",
-				StatValueStyle.Render(fmt.Sprintf("%d", s.ClassicalGames)), pct))
+			fmt.Fprintf(&b, "  Classical: %s games (%.1f%%)\n",
+				StatValueStyle.Render(fmt.Sprintf("%d", s.ClassicalGames)), pct)
 		}
 	}
 
@@ -167,17 +167,17 @@ func RenderOpeningStats(openings []db.OpeningStats, playerName string, limit int
 		displayCount = len(openings)
 	}
 
-	b.WriteString(fmt.Sprintf("  Top %d Most Played Openings:\n", displayCount))
+	fmt.Fprintf(&b, "  Top %d Most Played Openings:\n", displayCount)
 	b.WriteString("\n")
 
 	// Table header
 	headerCols := []string{
-		HeaderStyle.Copy().Width(6).Render("ECO"),
-		HeaderStyle.Copy().Width(35).Render("OPENING"),
-		HeaderStyle.Copy().Width(8).Align(lipgloss.Right).Render("GAMES"),
-		HeaderStyle.Copy().Width(10).Align(lipgloss.Right).Render("WIN%"),
-		HeaderStyle.Copy().Width(10).Align(lipgloss.Right).Render("AS WHITE"),
-		HeaderStyle.Copy().Width(10).Align(lipgloss.Right).Render("AS BLACK"),
+		HeaderStyle.Width(6).Render("ECO"),
+		HeaderStyle.Width(35).Render("OPENING"),
+		HeaderStyle.Width(8).Align(lipgloss.Right).Render("GAMES"),
+		HeaderStyle.Width(10).Align(lipgloss.Right).Render("WIN%"),
+		HeaderStyle.Width(10).Align(lipgloss.Right).Render("AS WHITE"),
+		HeaderStyle.Width(10).Align(lipgloss.Right).Render("AS BLACK"),
 	}
 	header := lipgloss.JoinHorizontal(lipgloss.Top, headerCols...)
 	b.WriteString("  " + header)
@@ -212,12 +212,12 @@ func RenderOpeningStats(openings []db.OpeningStats, playerName string, limit int
 		}
 
 		cols := []string{
-			rowStyle.Copy().Width(6).Render(op.ECOCode),
-			rowStyle.Copy().Width(35).Render(name),
-			rowStyle.Copy().Width(8).Align(lipgloss.Right).Render(fmt.Sprintf("%d", op.Games)),
-			rowStyle.Copy().Width(10).Align(lipgloss.Right).Render(winRateStyle.Render(winRateText)),
-			rowStyle.Copy().Width(10).Align(lipgloss.Right).Render(fmt.Sprintf("%.1f%%", op.WhiteWinRate)),
-			rowStyle.Copy().Width(10).Align(lipgloss.Right).Render(fmt.Sprintf("%.1f%%", op.BlackWinRate)),
+			rowStyle.Width(6).Render(op.ECOCode),
+			rowStyle.Width(35).Render(name),
+			rowStyle.Width(8).Align(lipgloss.Right).Render(fmt.Sprintf("%d", op.Games)),
+			rowStyle.Width(10).Align(lipgloss.Right).Render(winRateStyle.Render(winRateText)),
+			rowStyle.Width(10).Align(lipgloss.Right).Render(fmt.Sprintf("%.1f%%", op.WhiteWinRate)),
+			rowStyle.Width(10).Align(lipgloss.Right).Render(fmt.Sprintf("%.1f%%", op.BlackWinRate)),
 		}
 		row := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
 		b.WriteString("  " + row)
@@ -227,7 +227,7 @@ func RenderOpeningStats(openings []db.OpeningStats, playerName string, limit int
 	// Show best/worst for single player
 	if playerName != "" && len(openings) > 0 {
 		b.WriteString("\n")
-		b.WriteString(fmt.Sprintf("  Opening Performance for %s:\n", StatValueStyle.Render(playerName)))
+		fmt.Fprintf(&b, "  Opening Performance for %s:\n", StatValueStyle.Render(playerName))
 
 		var best, worst *db.OpeningStats
 		for i := range openings {
@@ -242,18 +242,18 @@ func RenderOpeningStats(openings []db.OpeningStats, playerName string, limit int
 		}
 
 		if best != nil {
-			b.WriteString(fmt.Sprintf("    Best:  %s (%s) - %s games, %s win rate\n",
+			fmt.Fprintf(&b, "    Best:  %s (%s) - %s games, %s win rate\n",
 				WinStyle.Render(best.ECOCode),
 				best.OpeningName,
 				StatValueStyle.Render(fmt.Sprintf("%d", best.Games)),
-				WinStyle.Render(fmt.Sprintf("%.1f%%", best.WinRate))))
+				WinStyle.Render(fmt.Sprintf("%.1f%%", best.WinRate)))
 		}
 		if worst != nil && worst.ECOCode != best.ECOCode {
-			b.WriteString(fmt.Sprintf("    Worst: %s (%s) - %s games, %s win rate\n",
+			fmt.Fprintf(&b, "    Worst: %s (%s) - %s games, %s win rate\n",
 				LossStyle.Render(worst.ECOCode),
 				worst.OpeningName,
 				StatValueStyle.Render(fmt.Sprintf("%d", worst.Games)),
-				LossStyle.Render(fmt.Sprintf("%.1f%%", worst.WinRate))))
+				LossStyle.Render(fmt.Sprintf("%.1f%%", worst.WinRate)))
 		}
 	}
 
@@ -273,7 +273,7 @@ func RenderPositionStats(uniqueCount int, topPositions []db.PositionFrequency) s
 		return b.String()
 	}
 
-	b.WriteString(fmt.Sprintf("  Unique positions: %s\n", StatValueStyle.Render(fmt.Sprintf("%d", uniqueCount))))
+	fmt.Fprintf(&b, "  Unique positions: %s\n", StatValueStyle.Render(fmt.Sprintf("%d", uniqueCount)))
 
 	if len(topPositions) > 0 {
 		b.WriteString("\n")
@@ -282,13 +282,13 @@ func RenderPositionStats(uniqueCount int, topPositions []db.PositionFrequency) s
 
 		// Table header
 		headerCols := []string{
-			HeaderStyle.Copy().Width(6).Align(lipgloss.Right).Render("COUNT"),
-			HeaderStyle.Copy().Width(8).Align(lipgloss.Right).Render("WHITE%"),
-			HeaderStyle.Copy().Width(8).Align(lipgloss.Right).Render("BLACK%"),
-			HeaderStyle.Copy().Width(8).Align(lipgloss.Right).Render("DRAW%"),
-			HeaderStyle.Copy().Width(6).Render("ECO"),
-			HeaderStyle.Copy().Width(25).Render("OPENING"),
-			HeaderStyle.Copy().Width(40).Render("FEN"),
+			HeaderStyle.Width(6).Align(lipgloss.Right).Render("COUNT"),
+			HeaderStyle.Width(8).Align(lipgloss.Right).Render("WHITE%"),
+			HeaderStyle.Width(8).Align(lipgloss.Right).Render("BLACK%"),
+			HeaderStyle.Width(8).Align(lipgloss.Right).Render("DRAW%"),
+			HeaderStyle.Width(6).Render("ECO"),
+			HeaderStyle.Width(25).Render("OPENING"),
+			HeaderStyle.Width(40).Render("FEN"),
 		}
 		header := lipgloss.JoinHorizontal(lipgloss.Top, headerCols...)
 		b.WriteString("  " + header)
@@ -321,13 +321,13 @@ func RenderPositionStats(uniqueCount int, topPositions []db.PositionFrequency) s
 			}
 
 			cols := []string{
-				rowStyle.Copy().Width(6).Align(lipgloss.Right).Render(fmt.Sprintf("%d", pos.Count)),
-				rowStyle.Copy().Width(8).Align(lipgloss.Right).Render(WinStyle.Render(fmt.Sprintf("%.1f", pos.WhiteWinPct))),
-				rowStyle.Copy().Width(8).Align(lipgloss.Right).Render(LossStyle.Render(fmt.Sprintf("%.1f", pos.BlackWinPct))),
-				rowStyle.Copy().Width(8).Align(lipgloss.Right).Render(DrawStyle.Render(fmt.Sprintf("%.1f", pos.DrawPct))),
-				rowStyle.Copy().Width(6).Render(eco),
-				rowStyle.Copy().Width(25).Render(opening),
-				rowStyle.Copy().Width(40).Render(fen),
+				rowStyle.Width(6).Align(lipgloss.Right).Render(fmt.Sprintf("%d", pos.Count)),
+				rowStyle.Width(8).Align(lipgloss.Right).Render(WinStyle.Render(fmt.Sprintf("%.1f", pos.WhiteWinPct))),
+				rowStyle.Width(8).Align(lipgloss.Right).Render(LossStyle.Render(fmt.Sprintf("%.1f", pos.BlackWinPct))),
+				rowStyle.Width(8).Align(lipgloss.Right).Render(DrawStyle.Render(fmt.Sprintf("%.1f", pos.DrawPct))),
+				rowStyle.Width(6).Render(eco),
+				rowStyle.Width(25).Render(opening),
+				rowStyle.Width(40).Render(fen),
 			}
 			row := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
 			b.WriteString("  " + row)

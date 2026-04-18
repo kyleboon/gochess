@@ -53,7 +53,7 @@ func ImportCommand(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	totalGames := 0
 	hasErrors := false

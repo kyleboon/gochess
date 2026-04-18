@@ -113,7 +113,7 @@ func (c *Client) doRequestWithRetry(ctx context.Context, req *http.Request) (*ht
 		}
 
 		// Close the body before retrying
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		// If this was the last attempt, return the error
 		if attempt == c.retryConfig.MaxRetries {
@@ -185,7 +185,7 @@ func (c *Client) GetPlayerGamesPGN(ctx context.Context, params GamesParams) (str
 		c.logger.Error("HTTP request failed", "error", err, "url", apiURL)
 		return "", fmt.Errorf("failed to fetch games: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	c.logger.Debug("received HTTP response",
 		"statusCode", resp.StatusCode,

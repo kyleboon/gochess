@@ -89,14 +89,13 @@ func DownloadGames(c *cli.Context) error {
 		params.Vs = vs
 	}
 
-	if rated != "" {
-		if rated == "true" {
-			ratedBool := true
-			params.Rated = &ratedBool
-		} else if rated == "false" {
-			ratedBool := false
-			params.Rated = &ratedBool
-		}
+	switch rated {
+	case "true":
+		ratedBool := true
+		params.Rated = &ratedBool
+	case "false":
+		ratedBool := false
+		params.Rated = &ratedBool
 	}
 
 	if perfType != "" {
@@ -131,14 +130,14 @@ func DownloadGames(c *cli.Context) error {
 			return fmt.Errorf("failed to create temporary file: %w", err)
 		}
 		tmpPath := tmpfile.Name()
-		defer os.Remove(tmpPath) // Clean up
+		defer func() { _ = os.Remove(tmpPath) }() // Clean up
 
 		// Write PGN to temporary file
 		if _, err := tmpfile.WriteString(pgn); err != nil {
-			tmpfile.Close()
+			_ = tmpfile.Close()
 			return fmt.Errorf("failed to write to temporary file: %w", err)
 		}
-		tmpfile.Close()
+		_ = tmpfile.Close()
 
 		// Open database
 		fmt.Printf("Opening database at %s...\n", dbPath)
@@ -146,7 +145,7 @@ func DownloadGames(c *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to open database: %w", err)
 		}
-		defer database.Close()
+		defer func() { _ = database.Close() }()
 
 		// Import the PGN file
 		count, errors := database.ImportPGN(c.Context, tmpPath)
@@ -179,7 +178,7 @@ func DownloadGames(c *cli.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to create output file: %w", err)
 			}
-			defer outputFile.Close()
+			defer func() { _ = outputFile.Close() }()
 
 			_, err = outputFile.WriteString(pgn)
 			if err != nil {
@@ -202,11 +201,11 @@ func DownloadGames(c *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
-		defer outputWriter.Close()
+		defer func() { _ = outputWriter.Close() }()
 	}
 
 	// Write PGN to output
-	fmt.Fprintln(outputWriter, pgn)
+	_, _ = fmt.Fprintln(outputWriter, pgn)
 
 	if output != "" {
 		fmt.Printf("Downloaded %d games for %s to %s\n", gameCount, username, output)
@@ -283,14 +282,14 @@ func ImportFromConfig(ctx context.Context, cfg *config.Config, database *db.DB, 
 		return 0, fmt.Errorf("failed to create temporary file: %w", err)
 	}
 	tmpPath := tmpfile.Name()
-	defer os.Remove(tmpPath) // Clean up
+	defer func() { _ = os.Remove(tmpPath) }() // Clean up
 
 	// Write PGN to temporary file
 	if _, err := tmpfile.WriteString(pgn); err != nil {
-		tmpfile.Close()
+		_ = tmpfile.Close()
 		return 0, fmt.Errorf("failed to write to temporary file: %w", err)
 	}
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	// Import the PGN file
 	count, errors := database.ImportPGN(ctx, tmpPath)

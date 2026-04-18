@@ -173,8 +173,8 @@ func (m GameListModel) renderGameDetails() string {
 		blackElo = fmt.Sprintf(" (%d)", game.BlackElo)
 	}
 
-	b.WriteString(fmt.Sprintf("  White: %s%s\n", StatValueStyle.Render(game.White), whiteElo))
-	b.WriteString(fmt.Sprintf("  Black: %s%s\n", StatValueStyle.Render(game.Black), blackElo))
+	fmt.Fprintf(&b, "  White: %s%s\n", StatValueStyle.Render(game.White), whiteElo)
+	fmt.Fprintf(&b, "  Black: %s%s\n", StatValueStyle.Render(game.Black), blackElo)
 
 	// Result with color
 	resultStyle := lipgloss.NewStyle()
@@ -186,23 +186,23 @@ func (m GameListModel) renderGameDetails() string {
 	case "1/2-1/2":
 		resultStyle = DrawStyle
 	}
-	b.WriteString(fmt.Sprintf("  Result: %s\n", resultStyle.Render(game.Result)))
+	fmt.Fprintf(&b, "  Result: %s\n", resultStyle.Render(game.Result))
 
 	// Game info
 	b.WriteString("\n")
 	b.WriteString(SubtitleStyle.Render("Game Information"))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  Event: %s\n", game.Event))
-	b.WriteString(fmt.Sprintf("  Site: %s\n", game.Site))
-	b.WriteString(fmt.Sprintf("  Date: %s\n", game.Date))
+	fmt.Fprintf(&b, "  Event: %s\n", game.Event)
+	fmt.Fprintf(&b, "  Site: %s\n", game.Site)
+	fmt.Fprintf(&b, "  Date: %s\n", game.Date)
 	if game.TimeControl != "" {
-		b.WriteString(fmt.Sprintf("  Time Control: %s\n", game.TimeControl))
+		fmt.Fprintf(&b, "  Time Control: %s\n", game.TimeControl)
 	}
 	if game.ECOCode != "" {
-		b.WriteString(fmt.Sprintf("  Opening: %s - %s (%s)\n",
+		fmt.Fprintf(&b, "  Opening: %s - %s (%s)\n",
 			StatValueStyle.Render(game.ECOCode),
 			game.OpeningName,
-			game.OpeningVariation))
+			game.OpeningVariation)
 	}
 
 	// PGN (if available and not too long)

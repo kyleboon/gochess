@@ -16,13 +16,13 @@ func TestImportPGN_WithFEN(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Test with a PGN file that has a FEN, which should be ignored
 	pgnPath := "../../testdata/invalid_fen.pgn"
@@ -42,13 +42,13 @@ func TestImportPGN_NoFEN(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Test with a Lichess PGN file that has no FEN tag
 	// This simulates the real-world scenario that was causing errors
@@ -247,13 +247,13 @@ func TestCheckDuplicateGame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Insert a test game with a known hash
 	testHash := "test-hash-123"
@@ -261,7 +261,7 @@ func TestCheckDuplicateGame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to begin transaction: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.Exec(`
 		INSERT INTO games (event, site, date, round, white, black, result, pgn_text, game_hash)
@@ -323,20 +323,20 @@ func TestInsertGameRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("failed to begin transaction: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Prepare statements
 	stmtGame, err := tx.PrepareContext(ctx, `
@@ -348,7 +348,7 @@ func TestInsertGameRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to prepare game statement: %v", err)
 	}
-	defer stmtGame.Close()
+	defer func() { _ = stmtGame.Close() }()
 
 	stmtTag, err := tx.PrepareContext(ctx, `
 		INSERT INTO tags (game_id, tag_name, tag_value)
@@ -357,7 +357,7 @@ func TestInsertGameRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to prepare tag statement: %v", err)
 	}
-	defer stmtTag.Close()
+	defer func() { _ = stmtTag.Close() }()
 
 	tests := []struct {
 		name      string
@@ -469,13 +469,13 @@ func TestGetGameByID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 
@@ -636,13 +636,13 @@ func TestClearGames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	db, err := NewWithLogger(tempDir+"/test.db", logging.Discard())
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 
