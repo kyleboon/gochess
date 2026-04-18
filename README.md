@@ -185,6 +185,12 @@ last_import:
 
 You can edit this file manually or use the `gochess config` commands.
 
+## CI/CD Roadmap
+
+- [ ] **GoReleaser** — Cross-compile and publish binaries for macOS/Linux/Windows to GitHub Releases on tagged versions
+- [ ] **Build caching** — Cache Go module downloads and build artifacts to speed up CI runs
+- [ ] **Security scanning** — Run `govulncheck` on a schedule to catch known vulnerabilities in dependencies
+
 ## License
 
-TBD
+MIT — see [LICENSE](LICENSE) for details.
